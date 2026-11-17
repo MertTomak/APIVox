@@ -7,6 +7,7 @@ soundfile==0.14.0
 librosa==0.11.0
 jiwer==4.0.0
 piper-tts==1.8.0
+onnxruntime==1.32.0
 kokoro==0.9.4
 num2words==0.5.14
 cmudict==1.1.3

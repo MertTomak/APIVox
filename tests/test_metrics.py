@@ -20,14 +20,6 @@ def evaluate_one(hyp, record=None, **kwargs):
 
 
 @pytest.fixture
-def fake_normalize(monkeypatch):
-    """Stand-in for data_io.normalize_hyp: strip trailing sentence punctuation, collapse spaces."""
-    def normalize(text):
-        return " ".join(t.rstrip(".,;:!?") for t in text.split())
-    monkeypatch.setattr(data_io, "normalize_hyp", normalize, raising=False)
-
-
-@pytest.fixture
 def fake_split(monkeypatch):
     """Stand-in for data_io.load_split returning three records."""
     rows = [{"id": "a"}, {"id": "b"}, {"id": "c"}]
@@ -40,9 +32,9 @@ def results_dir(monkeypatch, tmp_path):
     return tmp_path
 
 
-# Tests below need data_io.normalize_hyp (fake_normalize).
+# Tests below use the real data_io.normalize_hyp.
 
-def test_case_error_fails_api_em_but_not_wer(fake_normalize):
+def test_case_error_fails_api_em_but_not_wer():
     out = evaluate_one("use dataframe.groupby to split the data")
     assert out["api_em"] == 0.0
     assert out["wer"] == 0.0
@@ -50,33 +42,33 @@ def test_case_error_fails_api_em_but_not_wer(fake_normalize):
     assert out["api_cer"] == pytest.approx(2 / 17)
 
 
-def test_exact_api_with_wrong_context_counts(fake_normalize):
+def test_exact_api_with_wrong_context_counts():
     out = evaluate_one("run DataFrame.groupby to cut the data")
     assert out["api_em"] == 1.0
     assert out["wer"] == pytest.approx(2 / 6)
     assert out["api_cer"] == 0.0
 
 
-def test_punctuation_after_api_still_counts(fake_normalize):
+def test_punctuation_after_api_still_counts():
     record = rec(api="norm", written="compute the norm")
     out = evaluate_one("compute the norm.", record)
     assert out["api_em"] == 1.0
     assert out["wer"] == 0.0
 
 
-def test_api_must_be_a_whole_token(fake_normalize):
+def test_api_must_be_a_whole_token():
     record = rec(api="sort", written="use sort to order")
     assert evaluate_one("use sorted to order", record)["api_em"] == 0.0
     assert evaluate_one("use sort to order", record)["api_em"] == 1.0
 
 
-def test_api_cer_gives_partial_credit_to_near_miss(fake_normalize):
+def test_api_cer_gives_partial_credit_to_near_miss():
     out = evaluate_one("use data_frame.groupby to split the data")
     assert out["api_em"] == 0.0
     assert out["api_cer"] == pytest.approx(3 / 17)
 
 
-def test_empty_hypothesis_is_all_errors(fake_normalize):
+def test_empty_hypothesis_is_all_errors():
     out = evaluate_one("")
     assert out["api_em"] == 0.0
     assert out["wer"] == 1.0
@@ -84,19 +76,19 @@ def test_empty_hypothesis_is_all_errors(fake_normalize):
     assert out["api_cer"] == 1.0
 
 
-def test_evaluate_averages_over_utterances(fake_normalize):
+def test_evaluate_averages_over_utterances():
     records = [rec(), rec()]
     out = metrics.evaluate(records, [WRITTEN, "use dataframe.groupby to split the data"], n_boot=50)
     assert out["api_em"] == 0.5
     assert out["api_cer"] == pytest.approx(1 / 17)
 
 
-def test_evaluate_rejects_misaligned_input(fake_normalize):
+def test_evaluate_rejects_misaligned_input():
     with pytest.raises(ValueError, match="hypotheses"):
         metrics.evaluate([rec()], [])
 
 
-def test_nonexistent_api_rate(fake_normalize):
+def test_nonexistent_api_rate():
     index = {GROUPBY}
     records = [rec()] * 5
     hyps = [
@@ -112,7 +104,7 @@ def test_nonexistent_api_rate(fake_normalize):
     assert evaluate_one("use DataFrame", index=index)["nonexistent_api_rate"] == 1.0
 
 
-def test_slices_group_by_every_dimension(fake_normalize):
+def test_slices_group_by_every_dimension():
     records = [
         rec(library="pandas", engine="piper", style="explicit", speaker="p1", api_seen_in_train=True),
         rec(library="numpy", engine="human", style=None, speaker="m1", api_seen_in_train=False),
@@ -129,13 +121,13 @@ def test_slices_group_by_every_dimension(fake_normalize):
     assert out["api_seen_in_train"]["false"]["api_em"] == 0.5
 
 
-def test_bootstrap_ci_is_exact_for_perfect_system(fake_normalize):
+def test_bootstrap_ci_is_exact_for_perfect_system():
     records = [rec()] * 4
     ci = metrics.bootstrap_ci(records, [WRITTEN] * 4, n=100)
     assert ci == {"api_em": [1.0, 1.0], "wer": [0.0, 0.0]}
 
 
-def test_bootstrap_ci_is_seeded_and_brackets_the_estimate(fake_normalize):
+def test_bootstrap_ci_is_seeded_and_brackets_the_estimate():
     records = [rec()] * 10
     hyps = [WRITTEN] * 6 + ["use dataframe.groupby to split the data"] * 4
     first = metrics.bootstrap_ci(records, hyps, n=200, seed=3)
@@ -144,14 +136,14 @@ def test_bootstrap_ci_is_seeded_and_brackets_the_estimate(fake_normalize):
     assert 0.0 <= lo <= 0.6 <= hi <= 1.0
 
 
-def test_evaluate_ci_matches_bootstrap_ci(fake_normalize):
+def test_evaluate_ci_matches_bootstrap_ci():
     records = [rec()] * 6
     hyps = [WRITTEN] * 3 + ["nothing"] * 3
     out = metrics.evaluate(records, hyps, n_boot=100, seed=5)
     assert out["api_em_ci"] == metrics.bootstrap_ci(records, hyps, n=100, seed=5)["api_em"]
 
 
-def test_paired_bootstrap(fake_normalize):
+def test_paired_bootstrap():
     records = [rec()] * 8
     good, bad = [WRITTEN] * 8, ["nothing"] * 8
     assert metrics.paired_bootstrap(records, good, bad, n=100) == 1.0
@@ -159,7 +151,7 @@ def test_paired_bootstrap(fake_normalize):
     assert metrics.paired_bootstrap(records, good, good, n=100) == 0.5
 
 
-# Tests below need data_io.load_split (fake_split) and no normalization.
+# Tests below need data_io.load_split (fake_split).
 
 def test_validate_preds_accepts_exact_ids(fake_split):
     metrics.validate_preds("dev", [{"id": i, "hyp": "x"} for i in "cab"])

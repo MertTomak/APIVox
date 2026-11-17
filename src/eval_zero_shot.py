@@ -174,6 +174,16 @@ def run_dev(args: argparse.Namespace, device: torch.device) -> None:
         del processor, model
 
 
+def write_raw_preds(model: str, split: str, preds: list[dict]) -> Path:
+    """Validate and write the raw hypotheses to results/preds/<model>_seed0_<split>.raw.jsonl."""
+    metrics.validate_preds(split, preds, final=True)
+    path = metrics.RESULTS_DIR / "preds" / f"{model}_seed{SEED}_{split}.raw.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = (json.dumps({"id": p["id"], "hyp": p["hyp"]}, ensure_ascii=False) for p in preds)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
 def run_final(args: argparse.Namespace, device: torch.device) -> None:
     """Write predictions and a run file for every final split and every chosen model."""
     for name in args.models:
@@ -185,6 +195,7 @@ def run_final(args: argparse.Namespace, device: torch.device) -> None:
             converted = [convert(h) for h in raw]
             preds = [{"id": r["id"], "hyp": h} for r, h in zip(records, converted)]
             metrics.write_preds(name, SEED, split, preds, final=True)
+            write_raw_preds(name, split, [{"id": r["id"], "hyp": h} for r, h in zip(records, raw)])
             splits[split] = {**metrics.evaluate(records, converted), "raw": metrics.evaluate(records, raw)}
             print(f"{name} {split}: api_em {splits[split]['api_em']:.3f} (raw {splits[split]['raw']['api_em']:.3f})")
         config = {"checkpoint": MODELS[name], "decoding": "greedy", "language": "en",

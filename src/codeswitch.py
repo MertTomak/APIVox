@@ -1,4 +1,4 @@
-"""Tests for src/verbalize.py."""
+"""Build Kazakh and Russian lexicons and tag each word as kz, ru, mix or amb."""
 import argparse
 
 

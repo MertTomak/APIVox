@@ -1,4 +1,4 @@
-"""Synthesize prompt audio with the open TTS voices."""
+"""Train and evaluate the GMM-HMM baseline on MFCC features."""
 import argparse
 
 

@@ -1,4 +1,4 @@
-"""Correct hypotheses by decoding against Sphinx inventories."""
+"""Fine-tune mHuBERT-147 with a CTC head on our character set and evaluate it."""
 import argparse
 
 

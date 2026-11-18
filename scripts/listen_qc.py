@@ -1,4 +1,4 @@
-"""Tests for src/inventory_decode.py."""
+"""Play sampled clips for listening QC and write results/human_qc.csv."""
 import argparse
 
 

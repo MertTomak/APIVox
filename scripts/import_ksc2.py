@@ -1,4 +1,4 @@
-"""Fine-tune and evaluate wav2vec 2.0."""
+"""Import the spontaneous part of KSC2 and the KSC read test set into data/raw."""
 import argparse
 
 

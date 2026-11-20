@@ -1,8 +1,7 @@
-"""Compute API exact match, error rates, confidence intervals and result files."""
-import argparse
+"""Score transcripts with corpus-level WER, CER and code-switching metrics, and write result files."""
 import json
 from pathlib import Path
-from typing import Any, Collection
+from typing import Any
 
 import jiwer
 import numpy as np
@@ -10,7 +9,9 @@ import numpy as np
 from src import data_io
 
 RESULTS_DIR = Path(__file__).resolve().parents[1] / "results"
-SLICE_DIMENSIONS = ("library", "engine", "style", "speaker", "api_seen_in_train")
+SLICE_DIMENSIONS = ("source", "program", "cs")
+RU_TAGS = ("ru", "mix")
+CI_METRICS = ("wer", "cer", "cs_wer")
 
 
 def _check_aligned(records: list[dict], hyps: list[str]) -> None:
@@ -20,119 +21,150 @@ def _check_aligned(records: list[dict], hyps: list[str]) -> None:
         raise ValueError("cannot score an empty list of utterances")
 
 
-def _api_hits(records: list[dict], norm_hyps: list[str]) -> np.ndarray:
-    hits = [r["api"] in h.split() for r, h in zip(records, norm_hyps)]
-    return np.array(hits, dtype=float)
+def _normalize(text: str) -> str:
+    """Apply data_io.normalize_text, failing clearly if the data_io v2 contract (B0) is missing."""
+    normalize = getattr(data_io, "normalize_text", None)
+    if normalize is None:
+        raise RuntimeError("data_io.normalize_text is missing: metrics needs data_io v2 (B0) to score")
+    return normalize(text)
 
 
-def _word_errors(records: list[dict], norm_hyps: list[str]) -> tuple[np.ndarray, np.ndarray]:
-    edits, words = [], []
-    for r, h in zip(records, norm_hyps):
-        out = jiwer.process_words(r["written"].lower(), h.lower())
-        edits.append(out.substitutions + out.deletions + out.insertions)
-        words.append(out.hits + out.substitutions + out.deletions)
-    return np.array(edits, dtype=float), np.array(words, dtype=float)
+def _references(records: list[dict]) -> list[str]:
+    """Return the reference texts after checking each is non-empty, normalized and fully tagged."""
+    refs = []
+    for r in records:
+        text = r["text"]
+        if not text:
+            raise ValueError(f"record {r['id']!r}: empty reference text cannot be scored")
+        if _normalize(text) != text:
+            raise ValueError(f"record {r['id']!r}: reference text is not normalized: {text!r}")
+        if len(r["lang_tags"]) != len(text.split()):
+            raise ValueError(f"record {r['id']!r}: {len(r['lang_tags'])} lang_tags for {len(text.split())} words")
+        refs.append(text)
+    return refs
 
 
-def _closest_token_cer(api: str, norm_hyp: str) -> float:
-    """Character error rate of the API against its closest hypothesis token, capped at 1."""
-    tokens = norm_hyp.split()
-    if not tokens:
-        return 1.0
-    return min(1.0, min(jiwer.cer(api, t) for t in tokens))
+def _edits(alignment: list) -> int:
+    """Count substituted, deleted and inserted units in one jiwer alignment."""
+    total = 0
+    for chunk in alignment:
+        if chunk.type in ("substitute", "delete"):
+            total += chunk.ref_end_idx - chunk.ref_start_idx
+        elif chunk.type == "insert":
+            total += chunk.hyp_end_idx - chunk.hyp_start_idx
+    return total
 
 
-def _is_code_like(token: str) -> bool:
-    has_letter = any(c.isalpha() for c in token)
-    return has_letter and ("." in token or "_" in token or any(c.isupper() for c in token[1:]))
+def _ru_hits(alignment: list, tags: list[str]) -> int:
+    """Count reference words tagged ru or mix that the alignment marks as equal."""
+    return sum(
+        tags[i] in RU_TAGS
+        for chunk in alignment if chunk.type == "equal"
+        for i in range(chunk.ref_start_idx, chunk.ref_end_idx)
+    )
 
 
-def _has_nonexistent_api(norm_hyp: str, index: Collection[str]) -> bool:
-    return any(_is_code_like(t) and t not in index for t in norm_hyp.split())
+def _counts(records: list[dict], hyps: list[str]) -> dict[str, np.ndarray]:
+    """Per-utterance error and reference counts for words, characters and ru/mix words."""
+    _check_aligned(records, hyps)
+    refs = _references(records)
+    norm = [_normalize(h) for h in hyps]
+    words = jiwer.process_words(refs, norm)
+    chars = jiwer.process_characters(refs, norm)
+    tags = [r["lang_tags"] for r in records]
+    return {
+        "word_edits": np.array([_edits(a) for a in words.alignments], dtype=float),
+        "words": np.array([len(ref.split()) for ref in refs], dtype=float),
+        "char_edits": np.array([_edits(a) for a in chars.alignments], dtype=float),
+        "chars": np.array([len(ref) for ref in refs], dtype=float),
+        "ru_hits": np.array([_ru_hits(a, t) for a, t in zip(words.alignments, tags)], dtype=float),
+        "ru_words": np.array([sum(t in RU_TAGS for t in ts) for ts in tags], dtype=float),
+        "cs": np.array([bool(r["cs"]) for r in records]),
+    }
 
 
-def _percentile_ci(samples: np.ndarray) -> list[float]:
-    lo, hi = np.percentile(samples, [2.5, 97.5])
-    return [float(lo), float(hi)]
+def _ratio(num: np.ndarray, den: np.ndarray, mask: np.ndarray | None = None) -> float | None:
+    """Return sum(num) / sum(den) over the masked utterances, or None when the denominator is 0."""
+    if mask is not None:
+        num, den = num[mask], den[mask]
+    total = den.sum()
+    return float(num.sum() / total) if total else None
+
+
+def _metrics(c: dict[str, np.ndarray]) -> dict[str, Any]:
+    return {
+        "wer": _ratio(c["word_edits"], c["words"]),
+        "cer": _ratio(c["char_edits"], c["chars"]),
+        "cs_wer": _ratio(c["word_edits"], c["words"], c["cs"]),
+        "mono_wer": _ratio(c["word_edits"], c["words"], ~c["cs"]),
+        "ru_word_acc": _ratio(c["ru_hits"], c["ru_words"]),
+        "n_utts": int(len(c["words"])),
+        "n_ref_words": int(c["words"].sum()),
+    }
+
+
+def evaluate(records: list[dict], hyps: list[str]) -> dict[str, Any]:
+    """Corpus-level metrics of aligned hypotheses; a metric whose subset is empty is None."""
+    return _metrics(_counts(records, hyps))
+
+
+def slices(records: list[dict], hyps: list[str]) -> dict[str, dict[str, dict[str, Any]]]:
+    """The evaluate metrics per source, per program and per cs value ("true" / "false")."""
+    _check_aligned(records, hyps)
+    result: dict[str, dict[str, dict[str, Any]]] = {}
+    for dim in SLICE_DIMENSIONS:
+        groups: dict[str, list[int]] = {}
+        for i, r in enumerate(records):
+            key = str(r[dim]).lower() if isinstance(r[dim], bool) else str(r[dim])
+            groups.setdefault(key, []).append(i)
+        result[dim] = {
+            key: evaluate([records[i] for i in ids], [hyps[i] for i in ids])
+            for key, ids in sorted(groups.items())
+        }
+    return result
 
 
 def _resample_indices(n_items: int, n: int, seed: int) -> np.ndarray:
     return np.random.default_rng(seed).integers(0, n_items, size=(n, n_items))
 
 
-def _bootstrap(hits: np.ndarray, edits: np.ndarray, words: np.ndarray, n: int, seed: int) -> dict[str, list[float]]:
-    idx = _resample_indices(len(hits), n, seed)
-    em = hits[idx].mean(axis=1)
-    wer = edits[idx].sum(axis=1) / words[idx].sum(axis=1)
-    return {"api_em": _percentile_ci(em), "wer": _percentile_ci(wer)}
+def _resampled_ratio(num: np.ndarray, den: np.ndarray, idx: np.ndarray) -> np.ndarray:
+    """Ratio per resample; resamples with a zero denominator give NaN."""
+    den_sum = den[idx].sum(axis=1)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.where(den_sum > 0, num[idx].sum(axis=1) / den_sum, np.nan)
 
 
-def evaluate(
-    records: list[dict],
-    hyps: list[str],
-    index: Collection[str] | None = None,
-    n_boot: int = 1000,
-    seed: int = 0,
-) -> dict[str, Any]:
-    """Score aligned hypotheses; nonexistent_api_rate is None when no inventory index is given."""
-    _check_aligned(records, hyps)
-    norm = [data_io.normalize_hyp(h) for h in hyps]
-    hits = _api_hits(records, norm)
-    edits, words = _word_errors(records, norm)
-    refs = [r["written"].lower() for r in records]
-    nonexistent = None if index is None else float(np.mean([_has_nonexistent_api(h, index) for h in norm]))
-    return {
-        "api_em": float(hits.mean()),
-        "api_em_ci": _bootstrap(hits, edits, words, n_boot, seed)["api_em"],
-        "wer": float(edits.sum() / words.sum()),
-        "cer": float(jiwer.cer(refs, [h.lower() for h in norm])),
-        "api_cer": float(np.mean([_closest_token_cer(r["api"], h) for r, h in zip(records, norm)])),
-        "nonexistent_api_rate": nonexistent,
+def _percentile_ci(samples: np.ndarray) -> list[float] | None:
+    if np.isnan(samples).all():
+        return None
+    lo, hi = np.nanpercentile(samples, [2.5, 97.5])
+    return [float(lo), float(hi)]
+
+
+def bootstrap_ci(records: list[dict], hyps: list[str], n: int = 1000, seed: int = 0) -> dict[str, list[float] | None]:
+    """95 % percentile CI of wer, cer and cs_wer from resampling utterances; None if a metric is undefined."""
+    c = _counts(records, hyps)
+    idx = _resample_indices(len(records), n, seed)
+    cs_words = np.where(c["cs"], c["words"], 0.0)
+    cs_edits = np.where(c["cs"], c["word_edits"], 0.0)
+    samples = {
+        "wer": _resampled_ratio(c["word_edits"], c["words"], idx),
+        "cer": _resampled_ratio(c["char_edits"], c["chars"], idx),
+        "cs_wer": _resampled_ratio(cs_edits, cs_words, idx),
     }
-
-
-def slices(
-    records: list[dict],
-    hyps: list[str],
-    index: Collection[str] | None = None,
-    n_boot: int = 1000,
-    seed: int = 0,
-) -> dict[str, dict[str, dict[str, Any]]]:
-    """Metrics per library, engine, style, speaker and api_seen_in_train, each with its size n."""
-    _check_aligned(records, hyps)
-    result: dict[str, dict[str, dict[str, Any]]] = {}
-    for dim in SLICE_DIMENSIONS:
-        groups: dict[str, list[int]] = {}
-        for i, r in enumerate(records):
-            value = r[dim]
-            key = str(value).lower() if isinstance(value, bool) else "none" if value is None else str(value)
-            groups.setdefault(key, []).append(i)
-        result[dim] = {
-            key: {**evaluate([records[i] for i in ids], [hyps[i] for i in ids], index, n_boot, seed), "n": len(ids)}
-            for key, ids in sorted(groups.items())
-        }
-    return result
-
-
-def bootstrap_ci(records: list[dict], hyps: list[str], n: int = 1000, seed: int = 0) -> dict[str, list[float]]:
-    """95% percentile CI of api_em and wer from resampling utterances."""
-    _check_aligned(records, hyps)
-    norm = [data_io.normalize_hyp(h) for h in hyps]
-    edits, words = _word_errors(records, norm)
-    return _bootstrap(_api_hits(records, norm), edits, words, n, seed)
+    return {name: _percentile_ci(samples[name]) for name in CI_METRICS}
 
 
 def paired_bootstrap(
     records: list[dict], hyps_a: list[str], hyps_b: list[str], n: int = 1000, seed: int = 0
 ) -> float:
-    """Probability that system A beats system B on api_em over shared resamples, ties counting half."""
-    _check_aligned(records, hyps_a)
-    _check_aligned(records, hyps_b)
-    hits_a = _api_hits(records, [data_io.normalize_hyp(h) for h in hyps_a])
-    hits_b = _api_hits(records, [data_io.normalize_hyp(h) for h in hyps_b])
+    """Probability that system A has lower WER than system B on shared resamples, ties counting half."""
+    a, b = _counts(records, hyps_a), _counts(records, hyps_b)
     idx = _resample_indices(len(records), n, seed)
-    diff = hits_a[idx].mean(axis=1) - hits_b[idx].mean(axis=1)
-    return float(((diff > 0).sum() + 0.5 * (diff == 0).sum()) / n)
+    wer_a = _resampled_ratio(a["word_edits"], a["words"], idx)
+    wer_b = _resampled_ratio(b["word_edits"], b["words"], idx)
+    return float(((wer_a < wer_b).sum() + 0.5 * (wer_a == wer_b).sum()) / n)
 
 
 def validate_preds(split: str, preds: list[dict], final: bool = False) -> None:
@@ -152,7 +184,7 @@ def validate_preds(split: str, preds: list[dict], final: bool = False) -> None:
 
 
 def write_preds(model: str, seed: int, split: str, preds: list[dict], final: bool = False) -> Path:
-    """Validate and write results/preds/<model>_seed<seed>_<split>.jsonl."""
+    """Validate and write the raw hypotheses to results/preds/<model>_seed<seed>_<split>.jsonl."""
     validate_preds(split, preds, final=final)
     path = RESULTS_DIR / "preds" / f"{model}_seed{seed}_{split}.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -162,8 +194,11 @@ def write_preds(model: str, seed: int, split: str, preds: list[dict], final: boo
 
 
 def write_result(
+    *,
     model: str,
     seed: int,
+    checkpoint: str | None,
+    revision: str | None,
     config: dict,
     train_time_s: float,
     hardware: str,
@@ -171,10 +206,12 @@ def write_result(
     best_epoch: int | None,
     splits: dict[str, dict],
 ) -> Path:
-    """Write results/<model>_seed<seed>.json."""
+    """Write results/<model>_seed<seed>.json; checkpoint and revision are None for our own models."""
     run = {
         "model": model,
         "seed": seed,
+        "checkpoint": checkpoint,
+        "revision": revision,
         "config": config,
         "train_time_s": train_time_s,
         "hardware": hardware,
@@ -186,16 +223,3 @@ def write_result(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(run, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return path
-
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    return parser.parse_args()
-
-
-def main() -> None:
-    parse_args()
-
-
-if __name__ == "__main__":
-    main()

@@ -51,6 +51,8 @@ We report programs and episodes instead of speakers because the corpus has no sp
 
 Known limitation: a guest could appear in two different podcast programs; the corpus gives no way to check this.
 
+Known limitation of the text policy: the hesitation list removes repeated "ы", "і", "м" and "э", but not elongated vowels such as "ааа", because a single "а" is a real word. A few such tokens remain in the references (test 4, test_talkshow 21, dev 3, train 195, test_read 0; counted from the manifests with the pattern `а{2,}|ә{2,}|о{2,}|у{2,}|е{2,}`). They are applied identically to every system, and the data is frozen at tag `data-v1`, so they stay.
+
 ## 4. Cleaning rules (`scripts/clean_dataset.py`)
 
 Each rule logs every removed utterance to `cleaning_log.csv` with the measured value and the threshold. Fixed thresholds are in the `THRESHOLDS` dictionary at the top of the script; the C4 bounds are computed from train only and applied to every split.
@@ -64,7 +66,7 @@ Each rule logs every removed utterance to `cleaning_log.csv` with the measured v
 | C5 | more than 0.1 % of samples at full scale | clipping | 378 (all train) |
 | C6 | energy-based speech ratio below 0.3 (librosa, top_db 40) | long silence, near-silent recordings | 0 |
 | C7 | identical decoded audio; the first id in sorted order is kept | duplicated segments | 0 |
-| C8 | clips rejected in the listening check (`results/human_qc.csv`) | music, cut-off or overlapped clips found by ear | 0 (listening check pending) |
+| C8 | clips rejected in the listening check (`results/human_qc.csv`) | music, cut-off or overlapped clips found by ear | 0: the data was frozen at tag `data-v1` before the listening check, so the check is reported in the README as a quality check and does not change the data |
 | C9 | train utterance whose text equals a dev or test text and has at least 4 words | text leakage between splits | 4 (train) |
 
 In total 603 utterances were removed. What the counts show:
@@ -94,7 +96,17 @@ Each word of a reference gets a tag `kz`, `ru`, `mix` or `amb`; an utterance is 
 - **Russian lexicon**: words of Russian sentences in the `parliament` and `tv_news` transcripts (no Kazakh-specific letter and at least two unambiguous Russian function words), 7559 words. We use no other source in our splits, so no evaluation text enters a lexicon.
 - **Word rule**, in order: single letters and Kazakh–Russian homographs (а, о, от, там, тот, ну, том, не, да, же, …) are `amb`; a Russian stem of at least 5 letters followed by a chain of Kazakh suffixes is `mix`; a Kazakh-specific letter gives `kz`; an unambiguous Russian function word, or a word only in the Russian lexicon, gives `ru`; a word only in the Kazakh lexicon gives `kz`; a word in both is `ru` or `kz` only if it is 20 times more frequent in that language. A word (or stem) seen at least 10 times in the Kazakh lexicon is treated as an established loan ("кодекс", "офис") and is never `ru` or `mix`.
 
-Two details of this rule were changed after looking at the tagged data. A plain "in one lexicon but not the other" rule missed words such as "уже" that also occur a few times in the Kazakh lexicon, because KSC read text quotes some Russian. And single letters, Kazakh "о" and established loans produced false alarms, mostly in the read set. The precision of the final tagger is measured by a manual check of 100 code-switched sentences (`python -m src.codeswitch --audit`). That check is still pending; its result goes into the README.
+Two details of this rule were changed after looking at the tagged data. A plain "in one lexicon but not the other" rule missed words such as "уже" that also occur a few times in the Kazakh lexicon, because KSC read text quotes some Russian. And single letters, Kazakh "о" and established loans produced false alarms, mostly in the read set. 
+
+### Precision audit
+
+`python -m src.codeswitch --audit` lists the code-switched dev utterances with every `ru` and `mix` word marked. The audit was planned for 100 sentences, but dev has only 57 code-switched utterances, so all 57 were checked by hand with a dictionary. They contain 79 marked words:
+
+- 75 are correct Russian words or Russian stems with Kazakh suffixes ("в общем", "уже", "может быть", "хотя бы", "двенадцать недель в году", "составтың", "школалардың").
+- 4 are wrong: the surname "карпович" (twice, `podcasts_07_02_022` and `podcasts_07_02_206`), the hesitation "ааа" (`podcasts_07_03_156`) and "акиматта" (`podcasts_07_02_167`), the Russian spelling of the Kazakh administrative term "әкімдік".
+- Russian words that Kazakh speakers also use, but that have a Kazakh equivalent and are rare in read Kazakh text ("план", "минимум", "характер", "штраф", "этап", "период", "тренд"), were counted as correct: choosing the Russian word over the Kazakh one is a switch.
+
+**Word-level precision: 75 / 79 = 94.9 %.** **Utterance-level precision: 53 / 57 = 93.0 %** (the four wrong words are the only marked words of their utterances). The audit also showed missed Russian words, for example "заслуживают", "комфортный", "недель" and "друзей": the tagger is conservative, so the code-switched counts are a lower bound. The audit was done by a team member who is not a native speaker of Kazakh or Russian.
 
 ## 7. Rebuilding
 
@@ -119,3 +131,5 @@ python scripts/clean_dataset.py --check
 | 202 C4 removals from radio; 378 C5 removals from `podcasts_01` | `cleaning_log.csv` grouped by program |
 | 12666 hesitation tokens | `stats.json`: `hesitation_tokens_removed_by_normalization` |
 | lexicon sizes 111372 and 7559 | `stats.json`: `lexicon_sizes` |
+| 57 audited utterances, 79 marked words, 75 correct, 53 utterances correct | the audit list printed by `python -m src.codeswitch --audit` and the four wrong words named in section 6 |
+| leftover elongated-vowel tokens (4, 21, 3, 195, 0) | the manifests in `data/processed/`, counted with the pattern in section 3 |

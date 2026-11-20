@@ -16,12 +16,19 @@ from src import data_io, features, metrics, models
 ROOT = Path(__file__).resolve().parents[1]
 CHECKPOINT_DIR = ROOT / "checkpoints"
 TRAINED_SEEDS = (13, 42, 2026)
-FEATURE_FNS = {"logmel": features.logmel, "mfcc": features.mfcc}
 INT16_SCALE = 32767.0
 GRAD_CLIP = 5.0
 WARMUP_MAX_STEPS = 1000
 # The RNN-T joint tensor is [B, T, U + 1, J], so its batches are smaller to fit a 15 GB GPU.
 DEFAULT_BATCH_FRAMES = {"ctc": 20000, "aed": 20000, "rnnt": 6000}
+
+
+def mfcc_cmvn(wave: np.ndarray) -> np.ndarray:
+    """MFCC with per-utterance CMVN, so that the ctc-mfcc ablation differs from log-mel only in the features."""
+    return features.cmvn(features.mfcc(wave))
+
+
+FEATURE_FNS = {"logmel": features.logmel, "mfcc": mfcc_cmvn}
 
 
 def parse_args() -> argparse.Namespace:

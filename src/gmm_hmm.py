@@ -29,8 +29,9 @@ VAR_FLOOR = 0.01
 MIN_OCC = 1.0
 SPLIT_EPS = 0.2
 LM_SMOOTHING = 0.1
-LM_WEIGHTS = (1.0, 2.0, 4.0, 8.0)
-PENALTIES = (0.0, 1.0, 2.0, 3.0)
+LM_WEIGHTS = (1.0, 2.0, 4.0, 8.0, 16.0)
+PENALTIES = (-6.0, -4.0, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 4.0)
+SELECTION_METRIC = "cer"
 CHUNK = 100
 NEG = -np.inf
 FINAL_EVAL = ("test", "test_talkshow", "test_read")
@@ -392,16 +393,22 @@ def cpu_name() -> str:
     return f"{name} ({mp.cpu_count()} cores)"
 
 
+def length_ratio(dev: list[dict], hyps: list[str], size: Callable[[str], int]) -> float:
+    """Mean normalized hypothesis size divided by mean reference size."""
+    return float(np.mean([size(data_io.normalize_text(h)) for h in hyps]) / np.mean([size(r["text"]) for r in dev]))
+
+
 def tune(model: Model, lm: np.ndarray, cache: Path, dev: list[dict], beam: float, run_map: Callable) -> tuple[tuple[float, float], list[list[str]]]:
-    """Score the LM weight x insertion penalty grid on dev and return the best setting with its dev hypotheses."""
+    """Score the LM weight x insertion penalty grid on dev and return the setting with the lowest dev CER and its hypotheses."""
     settings = list(itertools.product(LM_WEIGHTS, PENALTIES))
     hyps = decode_split(model, lm, cache, [r["id"] for r in dev], settings, beam, run_map)
-    wers = [metrics.evaluate(dev, h)["wer"] for h in hyps]
-    print("LM weight  insertion penalty  dev WER")
-    for (w, p), wer in zip(settings, wers):
-        print(f"{w:9.1f}  {p:17.1f}  {wer:.4f}")
-    best = int(np.argmin(wers))
-    print(f"best: LM weight {settings[best][0]}, insertion penalty {settings[best][1]}, dev WER {wers[best]:.4f}", flush=True)
+    scores = [metrics.evaluate(dev, h) for h in hyps]
+    print(f"LM weight  insertion penalty  dev {SELECTION_METRIC.upper()} (selected on)  dev WER")
+    for (w, p), sc in zip(settings, scores):
+        print(f"{w:9.1f}  {p:17.1f}  {sc[SELECTION_METRIC]:.4f}  {sc['wer']:.4f}")
+    best = int(np.argmin([sc[SELECTION_METRIC] for sc in scores]))
+    print(f"best: LM weight {settings[best][0]}, insertion penalty {settings[best][1]}, dev CER {scores[best]['cer']:.4f}, dev WER {scores[best]['wer']:.4f}")
+    print(f"hyp/ref length ratio: chars {length_ratio(dev, hyps[best], len):.3f}, words {length_ratio(dev, hyps[best], lambda t: len(t.split())):.3f}", flush=True)
     return settings[best], hyps[best]
 
 
@@ -460,6 +467,7 @@ def main(argv: list[str] | None = None) -> None:
         "insertion_penalty_grid": list(PENALTIES),
         "lm_weight": setting[0],
         "insertion_penalty": setting[1],
+        "selection_metric": f"dev_{SELECTION_METRIC}",
         "beam": args.beam,
         "train_hours_requested": args.train_hours,
         "train_hours_used": round(hours, 3),

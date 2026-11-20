@@ -135,4 +135,4 @@ def test_run_with_final_writes_all_predictions_and_the_run_file(end_to_end):
     run = json.loads((results / "gmm_hmm_seed42.json").read_text(encoding="utf-8"))
     assert run["model"] == "gmm_hmm" and run["best_epoch"] is None
     assert run["n_params"] == gmm_hmm.N_STATES * 2
-    assert {"lm_weight", "insertion_penalty", "train_hours_used", "skipped_utterances"} <= run["config"].keys()
+    assert {"lm_weight", "insertion_penalty", "selection_metric", "train_hours_used", "skipped_utterances"} <= run["config"].keys()

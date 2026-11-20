@@ -1,0 +1,180 @@
+{
+ "splits": {
+  "train": {
+   "utterances": 22811,
+   "hours": 31.079,
+   "programs": 7,
+   "episodes": 78,
+   "words": 221716,
+   "cs_utterances": 1301,
+   "cs_rate": 0.057,
+   "ru_words": 2483,
+   "mix_words": 210,
+   "amb_words": 16696,
+   "kz_words": 202327
+  },
+  "dev": {
+   "utterances": 1081,
+   "hours": 1.85,
+   "programs": 2,
+   "episodes": 8,
+   "words": 14100,
+   "cs_utterances": 57,
+   "cs_rate": 0.0527,
+   "ru_words": 72,
+   "mix_words": 7,
+   "amb_words": 1132,
+   "kz_words": 12889
+  },
+  "test": {
+   "utterances": 1546,
+   "hours": 2.885,
+   "programs": 1,
+   "episodes": 5,
+   "words": 20428,
+   "cs_utterances": 95,
+   "cs_rate": 0.0614,
+   "ru_words": 114,
+   "mix_words": 20,
+   "amb_words": 1290,
+   "kz_words": 19004
+  },
+  "test_talkshow": {
+   "utterances": 4368,
+   "hours": 6.798,
+   "programs": 1,
+   "episodes": 9,
+   "words": 50659,
+   "cs_utterances": 329,
+   "cs_rate": 0.0753,
+   "ru_words": 478,
+   "mix_words": 57,
+   "amb_words": 3133,
+   "kz_words": 46991
+  },
+  "test_read": {
+   "utterances": 3327,
+   "hours": 7.031,
+   "programs": 1,
+   "episodes": 1,
+   "words": 35691,
+   "cs_utterances": 12,
+   "cs_rate": 0.0036,
+   "ru_words": 15,
+   "mix_words": 2,
+   "amb_words": 1727,
+   "kz_words": 33947
+  }
+ },
+ "sources": {
+  "podcasts": {
+   "utterances": 11117,
+   "hours": 17.954,
+   "programs": 9,
+   "episodes": 59,
+   "words": 131519,
+   "cs_utterances": 884,
+   "cs_rate": 0.0795,
+   "ru_words": 1977,
+   "mix_words": 168,
+   "amb_words": 9967,
+   "kz_words": 119407
+  },
+  "radio": {
+   "utterances": 14321,
+   "hours": 17.859,
+   "programs": 1,
+   "episodes": 32,
+   "words": 124725,
+   "cs_utterances": 569,
+   "cs_rate": 0.0397,
+   "ru_words": 692,
+   "mix_words": 69,
+   "amb_words": 9151,
+   "kz_words": 114813
+  },
+  "talkshow": {
+   "utterances": 4368,
+   "hours": 6.798,
+   "programs": 1,
+   "episodes": 9,
+   "words": 50659,
+   "cs_utterances": 329,
+   "cs_rate": 0.0753,
+   "ru_words": 478,
+   "mix_words": 57,
+   "amb_words": 3133,
+   "kz_words": 46991
+  },
+  "read": {
+   "utterances": 3327,
+   "hours": 7.031,
+   "programs": 1,
+   "episodes": 1,
+   "words": 35691,
+   "cs_utterances": 12,
+   "cs_rate": 0.0036,
+   "ru_words": 15,
+   "mix_words": 2,
+   "amb_words": 1727,
+   "kz_words": 33947
+  }
+ },
+ "raw_utterances": {
+  "train": 23406,
+  "dev": 1082,
+  "test": 1547,
+  "test_talkshow": 4373,
+  "test_read": 3328
+ },
+ "removed_per_rule": {
+  "C1": {
+   "test_read": 1
+  },
+  "C4": {
+   "dev": 1,
+   "test": 1,
+   "test_talkshow": 5,
+   "train": 213
+  },
+  "C5": {
+   "train": 378
+  },
+  "C9": {
+   "train": 4
+  }
+ },
+ "removed_total": 603,
+ "leakage": {
+  "programs_in_more_than_one_split": 0,
+  "episodes_in_more_than_one_split": 0,
+  "eval_texts_verbatim_in_train_before_cleaning": {
+   "all": 4,
+   "min_4_words": 2
+  },
+  "eval_texts_verbatim_in_train_after_cleaning": {
+   "all": 1,
+   "min_4_words": 0
+  }
+ },
+ "hesitation_tokens_removed_by_normalization": 12666,
+ "lexicon_sizes": {
+  "kz": 111372,
+  "ru": 7559
+ },
+ "thresholds": {
+  "min_duration_s": 0.5,
+  "max_duration_s": 30.0,
+  "rate_max_robust_z": 4.0,
+  "clip_level": 0.999,
+  "max_clipped_share": 0.001,
+  "silence_top_db": 40.0,
+  "min_speech_ratio": 0.3,
+  "c9_min_words": 4
+ },
+ "computed_thresholds": {
+  "rate_low": 3.0014,
+  "rate_high": 46.2789
+ },
+ "split_plan_seed": 2026
+}

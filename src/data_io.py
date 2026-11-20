@@ -1,4 +1,4 @@
-"""Load and validate manifests, decode audio and normalize hypotheses.
+"""Load and validate manifests, decode audio and normalize text with the single Aralas text policy.
 
 CHARS is the output alphabet; CHAR2ID gives 0-based positions in CHARS. CTC models add 1 to
 every id so that index 0 is the blank.
@@ -6,42 +6,71 @@ every id so that index 0 is the blank.
 import argparse
 import json
 import re
-from pathlib import Path, PurePath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import numpy as np
 import soundfile as sf
+from num2words import num2words
 
 ROOT = Path(__file__).resolve().parents[1]
 PROCESSED_DIR = ROOT / "data" / "processed"
 SAMPLE_RATE = 16000
 
-CHARS = " '._" + "abcdefghijklmnopqrstuvwxyz" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "0123456789"
+# Russian letters without "ё" (mapped to "е" by normalize_text), then the nine Kazakh-specific letters.
+RUSSIAN_LETTERS = "абвгдежзийклмнопрстуфхцчшщъыьэюя"
+KAZAKH_LETTERS = "әғқңөұүһі"
+CHARS = " " + RUSSIAN_LETTERS + KAZAKH_LETTERS
 CHAR2ID = {c: i for i, c in enumerate(CHARS)}
 ID2CHAR = dict(enumerate(CHARS))
 
 OPEN_SPLITS = ("train", "dev")
-FINAL_SPLITS = ("test", "heldout", "test_kokoro", "test_human")
+FINAL_SPLITS = ("test", "test_talkshow", "test_read")
 SPLITS = OPEN_SPLITS + FINAL_SPLITS
-ENGINES = ("piper", "kokoro", "human")
-STYLES = ("explicit", "natural", "terse")
+SOURCES = ("podcasts", "radio", "talkshow", "read")
+LANG_TAGS = ("kz", "ru", "mix", "amb")
+CS_TAGS = ("ru", "mix")
 
 FIELDS = {
     "id": (str,),
     "split": (str,),
     "audio": (str,),
     "duration": (int, float),
-    "engine": (str,),
-    "speaker": (str,),
-    "library": (str,),
-    "doc_path": (str,),
-    "written": (str,),
-    "spoken": (str, type(None)),
-    "api": (str,),
-    "style": (str, type(None)),
-    "api_seen_in_train": (bool,),
+    "source": (str,),
+    "program": (str,),
+    "episode": (str,),
+    "text": (str,),
+    "text_orig": (str,),
+    "lang_tags": (list,),
+    "cs": (bool,),
 }
-CONTEXT_WORD = re.compile(r"[a-z']+")
+
+# Text policy steps, applied in this order by normalize_text.
+DIGITS = re.compile(r"\d+")
+BRACKETED = re.compile(r"\([^)]*\)|\[[^\]]*\]|\{[^}]*\}")
+DASHES = re.compile(r"[-‐-―−]")
 NON_CHARS = re.compile(f"[^{re.escape(CHARS)}]")
+# Hesitation tokens of the KSC2 transcripts; "а" is a real Kazakh and Russian word and is kept.
+HESITATION = re.compile(r"ы+|і+|м+|мхм|хм|э+")
+
+
+def _number_words(match: re.Match) -> str:
+    """Spell a digit group as Kazakh number words."""
+    return f" {num2words(int(match.group()), lang='kz')} "
+
+
+def normalize_text(text: str) -> str:
+    """The one text policy for references and hypotheses: lowercase, ё->е, digits->words, drop brackets, dashes and non-CHARS, drop hesitations."""
+    text = text.lower().replace("ё", "е")
+    text = DIGITS.sub(_number_words, text)
+    text = BRACKETED.sub(" ", text)
+    text = DASHES.sub(" ", text)
+    text = NON_CHARS.sub(" ", text)
+    return " ".join(w for w in text.split() if not HESITATION.fullmatch(w))
+
+
+def is_cs(lang_tags: list[str]) -> bool:
+    """True if the tags contain at least one Kazakh word and at least one Russian or mixed word."""
+    return "kz" in lang_tags and any(t in CS_TAGS for t in lang_tags)
 
 
 def _fail(record: dict, field: str, problem: str) -> None:
@@ -59,43 +88,32 @@ def _check_keys_and_types(record: dict) -> None:
             _fail(record, key, f"expected {' or '.join(t.__name__ for t in types)}, got {type(value).__name__}")
 
 
-def _check_api(record: dict) -> None:
-    api = record["api"]
-    if not api.strip():
-        _fail(record, "api", "must not be empty or whitespace")
-    if api[0] in ".'" or api[-1] in ".'":
-        _fail(record, "api", f"{api!r} must not start or end with '.' or an apostrophe")
-    if api.endswith("()"):
-        _fail(record, "api", f"{api!r} must not end in '()'")
-
-
-def _check_text(record: dict) -> None:
-    written, api = record["written"], record["api"]
-    bad = sorted({c for c in written if c not in CHAR2ID})
-    if bad:
-        _fail(record, "written", f"characters outside CHARS: {bad}")
-    tokens = written.split(" ")
-    if tokens.count(api) != 1:
-        _fail(record, "api", f"{api!r} must occur exactly once as a whole token in written, found {tokens.count(api)}")
-    for word in tokens:
-        if word != api and not CONTEXT_WORD.fullmatch(word):
-            _fail(record, "written", f"context word {word!r} is not lowercase a-z or apostrophe")
-
-
 def _check_audio_path(record: dict) -> None:
-    audio = PurePath(record["audio"])
-    if audio.is_absolute() or ".." in audio.parts:
+    posix, windows = PurePosixPath(record["audio"]), PureWindowsPath(record["audio"])
+    if posix.is_absolute() or windows.anchor or ".." in posix.parts or ".." in windows.parts:
         _fail(record, "audio", f"{record['audio']!r} must be a repo-relative path without '..'")
 
 
-def _check_engine_fields(record: dict) -> None:
-    human = record["engine"] == "human"
-    if human and record["spoken"] is not None:
-        _fail(record, "spoken", "must be null for a human clip")
-    if not human and record["spoken"] is None:
-        _fail(record, "spoken", "must not be null for a synthesized clip")
-    if not human and record["style"] is None:
-        _fail(record, "style", "must not be null for a synthesized clip")
+def _check_text(record: dict) -> None:
+    text = record["text"]
+    if not text:
+        _fail(record, "text", "must not be empty")
+    bad = sorted({c for c in text if c not in CHAR2ID})
+    if bad:
+        _fail(record, "text", f"characters outside CHARS: {bad}")
+    if normalize_text(text) != text:
+        _fail(record, "text", f"is not normalized: {text!r}")
+
+
+def _check_tags(record: dict) -> None:
+    tags, n_words = record["lang_tags"], len(record["text"].split())
+    if len(tags) != n_words:
+        _fail(record, "lang_tags", f"{len(tags)} tags for {n_words} words")
+    unknown = sorted({t for t in tags if t not in LANG_TAGS})
+    if unknown:
+        _fail(record, "lang_tags", f"unknown tags {unknown}, expected {LANG_TAGS}")
+    if record["cs"] != is_cs(tags):
+        _fail(record, "cs", f"is {record['cs']} but lang_tags say {is_cs(tags)}")
 
 
 def validate(record: dict) -> None:
@@ -103,16 +121,16 @@ def validate(record: dict) -> None:
     _check_keys_and_types(record)
     if record["split"] not in SPLITS:
         _fail(record, "split", f"unknown split {record['split']!r}")
-    if record["engine"] not in ENGINES:
-        _fail(record, "engine", f"unknown engine {record['engine']!r}")
-    if record["style"] is not None and record["style"] not in STYLES:
-        _fail(record, "style", f"unknown style {record['style']!r}")
+    if record["source"] not in SOURCES:
+        _fail(record, "source", f"unknown source {record['source']!r}")
     if record["duration"] <= 0:
         _fail(record, "duration", f"must be positive, got {record['duration']}")
+    for key in ("program", "episode"):
+        if not record[key]:
+            _fail(record, key, "must not be empty")
     _check_audio_path(record)
-    _check_api(record)
     _check_text(record)
-    _check_engine_fields(record)
+    _check_tags(record)
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -164,12 +182,6 @@ def load_audio(record: dict) -> np.ndarray:
     return np.clip(wave[:, 0], -1.0, 1.0)
 
 
-def normalize_hyp(text: str) -> str:
-    """Replace non-CHARS characters with spaces, strip "'" at token edges and "." at token ends, collapse spaces, keep case."""
-    tokens = (t.lstrip("'").rstrip(".'") for t in NON_CHARS.sub(" ", text).split())
-    return " ".join(t for t in tokens if t)
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate a processed split and print its size.")
     parser.add_argument("split", choices=SPLITS, help="split to validate")
@@ -181,7 +193,8 @@ def main() -> None:
     args = parse_args()
     records = load_split(args.split, final=args.final)
     hours = sum(r["duration"] for r in records) / 3600
-    print(f"{args.split}: {len(records)} valid records, {hours:.2f} h")
+    n_cs = sum(r["cs"] for r in records)
+    print(f"{args.split}: {len(records)} valid records, {hours:.2f} h, {n_cs} code-switched")
 
 
 if __name__ == "__main__":

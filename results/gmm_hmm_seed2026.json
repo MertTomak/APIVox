@@ -1,0 +1,87 @@
+{
+  "model": "gmm_hmm",
+  "seed": 2026,
+  "checkpoint": null,
+  "revision": null,
+  "config": {
+    "components": [
+      1,
+      2,
+      4,
+      8
+    ],
+    "iterations_per_stage": 3,
+    "lm_weight_grid": [
+      1.0,
+      2.0,
+      4.0,
+      8.0,
+      16.0
+    ],
+    "insertion_penalty_grid": [
+      -10.0,
+      -8.0,
+      -6.0,
+      -4.0,
+      -3.0,
+      -2.0,
+      -1.0,
+      0.0,
+      1.0,
+      2.0,
+      4.0
+    ],
+    "lm_weight": 8.0,
+    "insertion_penalty": -10.0,
+    "selection_metric": "dev_cer",
+    "penalty_on_grid_edge": true,
+    "beam": 200.0,
+    "train_hours_requested": null,
+    "train_hours_used": 31.079,
+    "train_utterances": 22811,
+    "skipped_utterances": 0,
+    "final_train_loglik_per_frame": -50.707857629761776
+  },
+  "train_time_s": 194.9776623249054,
+  "hardware": "Apple M5 (10 cores)",
+  "n_params": 1032,
+  "best_epoch": null,
+  "splits": {
+    "dev": {
+      "wer": 1.0125531914893617,
+      "cer": 0.6353457231905806,
+      "cs_wer": 1.0233100233100234,
+      "mono_wer": 1.0118562150732517,
+      "ru_word_acc": 0.0,
+      "n_utts": 1081,
+      "n_ref_words": 14100
+    },
+    "test": {
+      "wer": 1.01091638926963,
+      "cer": 0.656426910080309,
+      "cs_wer": 1.0046052631578948,
+      "mono_wer": 1.0114237359847684,
+      "ru_word_acc": 0.0,
+      "n_utts": 1546,
+      "n_ref_words": 20428
+    },
+    "test_talkshow": {
+      "wer": 1.0024872184606881,
+      "cer": 0.6113988397107355,
+      "cs_wer": 0.9964093357271095,
+      "mono_wer": 1.0030733935025864,
+      "ru_word_acc": 0.0,
+      "n_utts": 4368,
+      "n_ref_words": 50659
+    },
+    "test_read": {
+      "wer": 1.01529797427923,
+      "cer": 0.6439238108519565,
+      "cs_wer": 1.0105263157894737,
+      "mono_wer": 1.015323512013746,
+      "ru_word_acc": 0.0,
+      "n_utts": 3327,
+      "n_ref_words": 35691
+    }
+  }
+}

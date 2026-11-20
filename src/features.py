@@ -1,15 +1,15 @@
-"""Compute log-mel and MFCC features and audio augmentation from 16 kHz mono waveforms."""
+"""Compute log-mel and MFCC features and audio augmentation."""
 import argparse
 
+import librosa
 import numpy as np
 
 SAMPLE_RATE = 16000
-WIN_LENGTH = 400  # 25 ms
-HOP_LENGTH = 160  # 10 ms
+WIN_LENGTH = 400
+HOP_LENGTH = 160
+N_MFCC = 13
 N_FFT = 512
 N_MELS = 80
-N_CEPS = 13
-DELTA_WIDTH = 2
 LOG_FLOOR = 1e-10
 STD_FLOOR = 1e-5
 SPEED_FACTORS = (0.9, 1.0, 1.1)
@@ -19,7 +19,7 @@ N_TIME_MASKS, TIME_MASK_MAX = 2, 40
 
 
 def frame_count(n_samples: int) -> int:
-    """Number of frames T = 1 + floor((n - 400) / 160) for a clip of n >= 400 samples."""
+    """Number of log-mel frames T = 1 + floor((n - 400) / 160) for a clip of n >= 400 samples."""
     if n_samples < WIN_LENGTH:
         raise ValueError(f"need at least {WIN_LENGTH} samples (25 ms), got {n_samples}")
     return 1 + (n_samples - WIN_LENGTH) // HOP_LENGTH
@@ -45,17 +45,7 @@ def mel_filterbank() -> np.ndarray:
     return np.maximum(0.0, np.minimum(rising, falling))
 
 
-def dct_matrix() -> np.ndarray:
-    """Orthonormal DCT-II C[k, m] = sqrt(2 / 80) * cos(pi * k * (2m + 1) / 160), row 0 scaled by 1/sqrt(2), shape [13, 80]."""
-    k = np.arange(N_CEPS)[:, None]
-    m = np.arange(N_MELS)[None, :]
-    matrix = np.sqrt(2.0 / N_MELS) * np.cos(np.pi * k * (2 * m + 1) / (2 * N_MELS))
-    matrix[0] /= np.sqrt(2.0)
-    return matrix
-
-
 _MEL_FB = mel_filterbank()
-_DCT = dct_matrix()
 _WINDOW = np.hanning(WIN_LENGTH + 1)[:-1]  # periodic Hann
 
 
@@ -72,39 +62,26 @@ def _check_wave(wave: np.ndarray) -> np.ndarray:
 def cmvn(feats: np.ndarray) -> np.ndarray:
     """Per-utterance normalization x' = (x - mean_t(x)) / max(std_t(x), 1e-5) for every dimension."""
     std = np.maximum(feats.std(axis=0), STD_FLOOR)
-    return (feats - feats.mean(axis=0)) / std
-
-
-def _log_mel_energies(wave: np.ndarray) -> np.ndarray:
-    wave = _check_wave(wave)
-    frames = np.lib.stride_tricks.sliding_window_view(wave, WIN_LENGTH)[::HOP_LENGTH]
-    power = np.abs(np.fft.rfft(frames * _WINDOW, n=N_FFT)) ** 2
-    return np.log(np.maximum(power @ _MEL_FB.T, LOG_FLOOR))
+    return ((feats - feats.mean(axis=0)) / std).astype(np.float32)
 
 
 def logmel(wave: np.ndarray, normalize: bool = True) -> np.ndarray:
     """Log-mel features x[t, j] = log(sum_k |FFT_512(hann * frame_t)[k]|^2 * mel[j, k]), then CMVN, shape [T, 80]."""
-    feats = _log_mel_energies(wave)
-    return (cmvn(feats) if normalize else feats).astype(np.float32)
+    wave = _check_wave(wave)
+    frames = np.lib.stride_tricks.sliding_window_view(wave, WIN_LENGTH)[::HOP_LENGTH]
+    power = np.abs(np.fft.rfft(frames * _WINDOW, n=N_FFT)) ** 2
+    feats = np.log(np.maximum(power @ _MEL_FB.T, LOG_FLOOR))
+    return cmvn(feats) if normalize else feats.astype(np.float32)
 
 
-def deltas(feats: np.ndarray) -> np.ndarray:
-    """Regression deltas d[t] = sum_{n=1..2} n * (c[t+n] - c[t-n]) / (2 * sum_{n=1..2} n^2), edges repeated."""
-    padded = np.pad(feats, ((DELTA_WIDTH, DELTA_WIDTH), (0, 0)), mode="edge")
-    n_frames = feats.shape[0]
-    numerator = sum(
-        n * (padded[DELTA_WIDTH + n:DELTA_WIDTH + n + n_frames] - padded[DELTA_WIDTH - n:DELTA_WIDTH - n + n_frames])
-        for n in range(1, DELTA_WIDTH + 1)
+def mfcc(wave: np.ndarray) -> np.ndarray:
+    """Return 13 MFCC plus delta and delta-delta as float32[T, 39]."""
+    base = librosa.feature.mfcc(
+        y=wave, sr=SAMPLE_RATE, n_mfcc=N_MFCC, n_fft=WIN_LENGTH, hop_length=HOP_LENGTH,
     )
-    return numerator / (2 * sum(n * n for n in range(1, DELTA_WIDTH + 1)))
-
-
-def mfcc(wave: np.ndarray, normalize: bool = True) -> np.ndarray:
-    """MFCC c = DCT-II(log-mel)[:13] plus delta and delta-delta, then CMVN, shape [T, 39]."""
-    static = _log_mel_energies(wave) @ _DCT.T
-    delta = deltas(static)
-    feats = np.concatenate([static, delta, deltas(delta)], axis=1)
-    return (cmvn(feats) if normalize else feats).astype(np.float32)
+    d1 = librosa.feature.delta(base)
+    d2 = librosa.feature.delta(base, order=2)
+    return np.vstack([base, d1, d2]).T.astype(np.float32)
 
 
 def augment(wave: np.ndarray, rng: np.random.Generator) -> np.ndarray:

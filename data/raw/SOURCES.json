@@ -1,0 +1,27 @@
+{
+ "corpus": "ISSAI KSC2 (Kazakh Speech Corpus 2)",
+ "url": "https://huggingface.co/datasets/issai/Kazakh_Speech_Corpus_2",
+ "parts": {
+  "ISSAI_KSC2.tar.gz.partaa": 8388608000,
+  "ISSAI_KSC2.tar.gz.partab": 8388608000,
+  "ISSAI_KSC2.tar.gz.partac": 8388608000,
+  "ISSAI_KSC2.tar.gz.partad": 8388608000,
+  "ISSAI_KSC2.tar.gz.partae": 8388608000,
+  "ISSAI_KSC2.tar.gz.partaf": 8388608000,
+  "ISSAI_KSC2.tar.gz.partag": 8388608000,
+  "ISSAI_KSC2.tar.gz.partah": 8388608000,
+  "ISSAI_KSC2.tar.gz.partai": 8388608000,
+  "ISSAI_KSC2.tar.gz.partaj": 5311650212
+ },
+ "paper": "Mussakhojayeva, Khassanov, Varol (2022). KSC2: An Industrial-Scale Open-Source Kazakh Speech Corpus. Interspeech 2022, doi:10.21437/Interspeech.2022-421",
+ "licenses": {
+  "huggingface_card": "license: mit (https://huggingface.co/datasets/issai/Kazakh_Speech_Corpus_2)",
+  "github_recipe": "CC-BY-4.0 (https://github.com/IS2AI/Kazakh_ASR)",
+  "ksc_openslr_102": "Attribution 4.0 International (CC BY 4.0) (https://openslr.org/102/)"
+ },
+ "read_test_set": "Test/crowdsourced of KSC2 equals the test set of KSC v1.1 (Khassanov et al., 2021, arXiv:2009.10334).",
+ "retrieved": "2026-11-18/19",
+ "segments_imported": 33736,
+ "transcripts_in_all_text": 645861,
+ "opus_compression_level": 0.93
+}

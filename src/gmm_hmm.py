@@ -30,7 +30,7 @@ MIN_OCC = 1.0
 SPLIT_EPS = 0.2
 LM_SMOOTHING = 0.1
 LM_WEIGHTS = (1.0, 2.0, 4.0, 8.0, 16.0)
-PENALTIES = (-6.0, -4.0, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 4.0)
+PENALTIES = (-10.0, -8.0, -6.0, -4.0, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 4.0)
 SELECTION_METRIC = "cer"
 CHUNK = 100
 NEG = -np.inf
@@ -468,6 +468,7 @@ def main(argv: list[str] | None = None) -> None:
         "lm_weight": setting[0],
         "insertion_penalty": setting[1],
         "selection_metric": f"dev_{SELECTION_METRIC}",
+        "penalty_on_grid_edge": setting[1] in (min(PENALTIES), max(PENALTIES)),
         "beam": args.beam,
         "train_hours_requested": args.train_hours,
         "train_hours_used": round(hours, 3),

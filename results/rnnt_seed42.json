@@ -1,0 +1,89 @@
+{
+  "model": "rnnt",
+  "seed": 42,
+  "checkpoint": null,
+  "revision": null,
+  "config": {
+    "head": "rnnt",
+    "seed": 42,
+    "final": true,
+    "features": "logmel",
+    "no_aug": false,
+    "max_hours": null,
+    "max_minutes": 15.0,
+    "epochs": 40,
+    "patience": 6,
+    "lr": 0.001,
+    "weight_decay": 0.01,
+    "batch_frames": 6000,
+    "workers": 2,
+    "device": "auto",
+    "hidden": 256,
+    "layers": 4,
+    "dropout": 0.2,
+    "warmup_steps": 1000,
+    "planned_epochs": 1,
+    "stopped_by": "time_budget",
+    "n_train_clips": 22811,
+    "n_train_dropped": 0,
+    "dev_curve": [
+      {
+        "epoch": 1,
+        "train_loss": 2.1276,
+        "dev_wer": 1.0,
+        "dev_cer": 1.0,
+        "lr": 0.0009996184814138219,
+        "time_s": 471.9,
+        "peak_mem_gb": 0.8
+      }
+    ],
+    "joint_dim": 256,
+    "max_symbols_per_frame": 5
+  },
+  "train_time_s": 472.0,
+  "hardware": "Tesla T4",
+  "n_params": 7903531,
+  "best_epoch": 1,
+  "splits": {
+    "dev": {
+      "wer": 1.0,
+      "cer": 1.0,
+      "cs_wer": 1.0,
+      "mono_wer": 1.0,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 0.0,
+      "n_utts": 1081,
+      "n_ref_words": 14100
+    },
+    "test": {
+      "wer": 1.0,
+      "cer": 1.0,
+      "cs_wer": 1.0,
+      "mono_wer": 1.0,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 0.0,
+      "n_utts": 1546,
+      "n_ref_words": 20428
+    },
+    "test_talkshow": {
+      "wer": 1.0,
+      "cer": 1.0,
+      "cs_wer": 1.0,
+      "mono_wer": 1.0,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 0.0,
+      "n_utts": 4368,
+      "n_ref_words": 50659
+    },
+    "test_read": {
+      "wer": 1.0,
+      "cer": 1.0,
+      "cs_wer": 1.0,
+      "mono_wer": 1.0,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 0.0,
+      "n_utts": 3327,
+      "n_ref_words": 35691
+    }
+  }
+}

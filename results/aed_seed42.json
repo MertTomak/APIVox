@@ -1,0 +1,99 @@
+{
+  "model": "aed",
+  "seed": 42,
+  "checkpoint": null,
+  "revision": null,
+  "config": {
+    "head": "aed",
+    "seed": 42,
+    "final": true,
+    "features": "logmel",
+    "no_aug": false,
+    "max_hours": null,
+    "max_minutes": 25.0,
+    "epochs": 40,
+    "patience": 6,
+    "lr": 0.001,
+    "weight_decay": 0.01,
+    "batch_frames": 20000,
+    "workers": 2,
+    "device": "auto",
+    "hidden": 256,
+    "layers": 4,
+    "dropout": 0.2,
+    "warmup_steps": 1000,
+    "planned_epochs": 2,
+    "stopped_by": "time_budget",
+    "n_train_clips": 22811,
+    "n_train_dropped": 0,
+    "dev_curve": [
+      {
+        "epoch": 1,
+        "train_loss": 2.5868,
+        "dev_wer": 4.310567375886524,
+        "dev_cer": 5.238485513101697,
+        "lr": 0.000569,
+        "time_s": 514.6,
+        "peak_mem_gb": 1.06
+      },
+      {
+        "epoch": 2,
+        "train_loss": 2.0308,
+        "dev_wer": 6.911560283687943,
+        "dev_cer": 5.166255653615691,
+        "lr": 0.0,
+        "time_s": 507.0,
+        "peak_mem_gb": 1.06
+      }
+    ],
+    "max_decode_len": 500,
+    "label_smoothing": 0.1,
+    "attention_dim": 256
+  },
+  "train_time_s": 1021.6,
+  "hardware": "Tesla T4",
+  "n_params": 8985643,
+  "best_epoch": 1,
+  "splits": {
+    "dev": {
+      "wer": 4.310567375886524,
+      "cer": 5.238485513101697,
+      "cs_wer": 3.7296037296037294,
+      "mono_wer": 4.348210240144994,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 0.0003879276902785321,
+      "n_utts": 1081,
+      "n_ref_words": 14100
+    },
+    "test": {
+      "wer": 4.267622870569806,
+      "cer": 5.213455040154474,
+      "cs_wer": 3.5052631578947366,
+      "mono_wer": 4.328908398561455,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 0.0002631025047358451,
+      "n_utts": 1546,
+      "n_ref_words": 20428
+    },
+    "test_talkshow": {
+      "wer": 4.859807734065023,
+      "cer": 6.095159876371448,
+      "cs_wer": 4.138240574506284,
+      "mono_wer": 4.929398523905374,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 0.0005107360984018217,
+      "n_utts": 4368,
+      "n_ref_words": 50659
+    },
+    "test_read": {
+      "wer": 5.223137485640637,
+      "cer": 6.009603055623346,
+      "cs_wer": 3.536842105263158,
+      "mono_wer": 5.232162474296499,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 0.00023566147229504817,
+      "n_utts": 3327,
+      "n_ref_words": 35691
+    }
+  }
+}

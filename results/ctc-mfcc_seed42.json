@@ -1,0 +1,123 @@
+{
+  "model": "ctc-mfcc",
+  "seed": 42,
+  "checkpoint": null,
+  "revision": null,
+  "config": {
+    "head": "ctc",
+    "seed": 42,
+    "final": true,
+    "features": "mfcc",
+    "no_aug": false,
+    "max_hours": null,
+    "max_minutes": 35.0,
+    "epochs": 5,
+    "patience": 6,
+    "lr": 0.001,
+    "weight_decay": 0.01,
+    "batch_frames": 20000,
+    "workers": 2,
+    "device": "auto",
+    "hidden": 256,
+    "layers": 4,
+    "dropout": 0.2,
+    "warmup_steps": 1000,
+    "planned_epochs": 5,
+    "stopped_by": "max_epochs",
+    "n_train_clips": 22309,
+    "n_train_dropped": 502,
+    "dev_curve": [
+      {
+        "epoch": 1,
+        "train_loss": 3.6438,
+        "dev_wer": 1.0,
+        "dev_cer": 1.0,
+        "lr": 0.0005620000000000001,
+        "time_s": 407.4,
+        "peak_mem_gb": 0.41
+      },
+      {
+        "epoch": 2,
+        "train_loss": 3.2478,
+        "dev_wer": 1.0012056737588653,
+        "dev_cer": 0.8723410953585258,
+        "lr": 0.000988770185430327,
+        "time_s": 410.2,
+        "peak_mem_gb": 0.41
+      },
+      {
+        "epoch": 3,
+        "train_loss": 2.8899,
+        "dev_wer": 1.0039007092198582,
+        "dev_cer": 0.8201231989757904,
+        "lr": 0.0006864064145515969,
+        "time_s": 399.0,
+        "peak_mem_gb": 0.41
+      },
+      {
+        "epoch": 4,
+        "train_loss": 2.8416,
+        "dev_wer": 1.0026241134751772,
+        "dev_cer": 0.7939827689337097,
+        "lr": 0.00022000286365374955,
+        "time_s": 398.1,
+        "peak_mem_gb": 0.41
+      },
+      {
+        "epoch": 5,
+        "train_loss": 2.806,
+        "dev_wer": 1.0021985815602836,
+        "dev_cer": 0.7919784244383113,
+        "lr": 0.0,
+        "time_s": 394.6,
+        "peak_mem_gb": 0.41
+      }
+    ]
+  },
+  "train_time_s": 2009.3,
+  "hardware": "Tesla T4",
+  "n_params": 6032683,
+  "best_epoch": 1,
+  "splits": {
+    "dev": {
+      "wer": 1.0,
+      "cer": 1.0,
+      "cs_wer": 1.0,
+      "mono_wer": 1.0,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 0.0,
+      "n_utts": 1081,
+      "n_ref_words": 14100
+    },
+    "test": {
+      "wer": 1.0,
+      "cer": 1.0,
+      "cs_wer": 1.0,
+      "mono_wer": 1.0,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 0.0,
+      "n_utts": 1546,
+      "n_ref_words": 20428
+    },
+    "test_talkshow": {
+      "wer": 1.0,
+      "cer": 1.0,
+      "cs_wer": 1.0,
+      "mono_wer": 1.0,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 0.0,
+      "n_utts": 4368,
+      "n_ref_words": 50659
+    },
+    "test_read": {
+      "wer": 1.0,
+      "cer": 1.0,
+      "cs_wer": 1.0,
+      "mono_wer": 1.0,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 0.0,
+      "n_utts": 3327,
+      "n_ref_words": 35691
+    }
+  }
+}

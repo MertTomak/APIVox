@@ -1,0 +1,69 @@
+{
+  "model": "mms_kk_zs",
+  "seed": 0,
+  "checkpoint": "facebook/mms-1b-all",
+  "revision": "3d33597edbdaaba14a8e858e2c8caa76e3cec0cd",
+  "config": {
+    "architecture": "wav2vec 2.0 MMS-1B + kaz language adapter",
+    "family": "ctc",
+    "adapter": "kaz",
+    "language": null,
+    "decoding": "greedy",
+    "dtype": "float16",
+    "batch_seconds": 160.0,
+    "ksc_training": "not stated: the model card lists google/fleurs only",
+    "rtf": {
+      "dev": 0.01184155593532845,
+      "test": 0.012021458631775617,
+      "test_talkshow": 0.011179463978104723,
+      "test_read": 0.011391320641282465
+    },
+    "decode_time_s": 769.9
+  },
+  "train_time_s": 0.0,
+  "hardware": "Tesla T4",
+  "n_params": 964786924,
+  "best_epoch": null,
+  "splits": {
+    "dev": {
+      "wer": 0.5119148936170212,
+      "cer": 0.17149213478429684,
+      "cs_wer": 0.6095571095571095,
+      "mono_wer": 0.505588279716055,
+      "ru_word_acc": 0.1518987341772152,
+      "kz_word_acc": 0.5337109162852044,
+      "n_utts": 1081,
+      "n_ref_words": 14100
+    },
+    "test": {
+      "wer": 0.5002447620912474,
+      "cer": 0.1607202937347318,
+      "cs_wer": 0.5539473684210526,
+      "mono_wer": 0.49592764967209646,
+      "ru_word_acc": 0.1417910447761194,
+      "kz_word_acc": 0.5314144390654599,
+      "n_utts": 1546,
+      "n_ref_words": 20428
+    },
+    "test_talkshow": {
+      "wer": 0.4139244754140429,
+      "cer": 0.1331101317368136,
+      "cs_wer": 0.5031418312387792,
+      "mono_wer": 0.40532000086574466,
+      "ru_word_acc": 0.1588785046728972,
+      "kz_word_acc": 0.6305037134770488,
+      "n_utts": 4368,
+      "n_ref_words": 50659
+    },
+    "test_read": {
+      "wer": 0.2690033902104172,
+      "cer": 0.05940801171425583,
+      "cs_wer": 0.4368421052631579,
+      "mono_wer": 0.2681051237993296,
+      "ru_word_acc": 0.4117647058823529,
+      "kz_word_acc": 0.7547647803929655,
+      "n_utts": 3327,
+      "n_ref_words": 35691
+    }
+  }
+}

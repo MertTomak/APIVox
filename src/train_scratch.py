@@ -19,6 +19,7 @@ TRAINED_SEEDS = (13, 42, 2026)
 INT16_SCALE = 32767.0
 GRAD_CLIP = 5.0
 WARMUP_MAX_STEPS = 1000
+MAX_EPOCHS = 40
 # The RNN-T joint tensor is [B, T, U + 1, J], so its batches are smaller to fit a 15 GB GPU.
 DEFAULT_BATCH_FRAMES = {"ctc": 20000, "aed": 20000, "rnnt": 6000}
 
@@ -43,7 +44,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-hours", type=float, default=None, help="debug: use only the first N hours of train")
     parser.add_argument("--max-minutes", type=float, default=None,
                         help="training time budget; after epoch 1 the epochs and the cosine decay are fitted to it")
-    parser.add_argument("--epochs", type=int, default=40, help="maximum number of epochs (default: 40)")
+    parser.add_argument("--epochs", type=int, default=MAX_EPOCHS,
+                        help=f"maximum number of epochs (default: {MAX_EPOCHS})")
     parser.add_argument("--patience", type=int, default=6, help="epochs without dev improvement before stopping")
     parser.add_argument("--lr", type=float, default=1e-3, help="peak AdamW learning rate (default: 1e-3)")
     parser.add_argument("--weight-decay", type=float, default=0.01, help="AdamW weight decay (default: 0.01)")
@@ -237,7 +239,8 @@ def fit(args: argparse.Namespace, model: torch.nn.Module, train_set: Utterances,
         dev_set: Utterances, device: torch.device) -> tuple[dict, int, list[dict], float, dict]:
     """Train with early stopping on (dev WER, dev CER) within the time budget; return weights, epoch, curve, time, plan."""
     n_batches = len(make_batches(train_set.n_frames, args.batch_frames))
-    warmup = min(WARMUP_MAX_STEPS, max(1, args.epochs * n_batches // 10))
+    # Warmup does not depend on --epochs, so an --epochs N run repeats the schedule of a budget run planned to N.
+    warmup = min(WARMUP_MAX_STEPS, max(1, MAX_EPOCHS * n_batches // 10))
     schedule = WarmupCosine(warmup, args.epochs * n_batches)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, schedule)

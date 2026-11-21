@@ -1,0 +1,69 @@
+{
+  "model": "xlsr_kk_zs",
+  "seed": 0,
+  "checkpoint": "aismlv/wav2vec2-large-xlsr-kazakh",
+  "revision": "b277ef85de7bbd28302d570062feb196cc4e9107",
+  "config": {
+    "architecture": "wav2vec 2.0 XLSR-53 + CTC",
+    "family": "ctc",
+    "adapter": null,
+    "language": null,
+    "decoding": "greedy",
+    "dtype": "float16",
+    "batch_seconds": 160.0,
+    "ksc_training": "yes: fine-tuned on the KSC v1.1 train split (model card); test_read is the KSC test set",
+    "rtf": {
+      "dev": 0.006911827175392801,
+      "test": 0.0068100171991755136,
+      "test_talkshow": 0.0063491392548427365,
+      "test_read": 0.0063861662473167005
+    },
+    "decode_time_s": 437.9
+  },
+  "train_time_s": 0.0,
+  "hardware": "Tesla T4",
+  "n_params": 315484845,
+  "best_epoch": null,
+  "splits": {
+    "dev": {
+      "wer": 0.594822695035461,
+      "cer": 0.21029876276326698,
+      "cs_wer": 0.696969696969697,
+      "mono_wer": 0.5882041987615164,
+      "ru_word_acc": 0.06329113924050633,
+      "kz_word_acc": 0.43843587555279695,
+      "n_utts": 1081,
+      "n_ref_words": 14100
+    },
+    "test": {
+      "wer": 0.5831212061875857,
+      "cer": 0.20581179327394275,
+      "cs_wer": 0.6736842105263158,
+      "mono_wer": 0.5758409138988788,
+      "ru_word_acc": 0.04477611940298507,
+      "kz_word_acc": 0.4381709113870764,
+      "n_utts": 1546,
+      "n_ref_words": 20428
+    },
+    "test_talkshow": {
+      "wer": 0.461576422748179,
+      "cer": 0.15297387703566737,
+      "cs_wer": 0.5881956912028725,
+      "mono_wer": 0.4493647598640781,
+      "ru_word_acc": 0.044859813084112146,
+      "kz_word_acc": 0.5743440233236151,
+      "n_utts": 4368,
+      "n_ref_words": 50659
+    },
+    "test_read": {
+      "wer": 0.20316046062032445,
+      "cer": 0.04040333608370424,
+      "cs_wer": 0.42105263157894735,
+      "mono_wer": 0.20199431001943607,
+      "ru_word_acc": 0.17647058823529413,
+      "kz_word_acc": 0.8118832297404778,
+      "n_utts": 3327,
+      "n_ref_words": 35691
+    }
+  }
+}

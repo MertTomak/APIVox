@@ -1,0 +1,69 @@
+{
+  "model": "whisper_small_zs",
+  "seed": 0,
+  "checkpoint": "openai/whisper-small",
+  "revision": "973afd24965f72e36ca33b3055d56a652f456b4d",
+  "config": {
+    "architecture": "Transformer encoder-decoder",
+    "family": "whisper",
+    "adapter": null,
+    "language": "kk",
+    "decoding": "greedy",
+    "dtype": "float16",
+    "batch_seconds": 160.0,
+    "ksc_training": "not stated: the model card describes 680k hours of web audio and names no datasets",
+    "rtf": {
+      "dev": 0.1250690252137311,
+      "test": 0.11872530927112813,
+      "test_talkshow": 0.12231042827158078,
+      "test_read": 0.04899182886211283
+    },
+    "decode_time_s": 6304.8
+  },
+  "train_time_s": 0.0,
+  "hardware": "Tesla T4",
+  "n_params": 241734912,
+  "best_epoch": null,
+  "splits": {
+    "dev": {
+      "wer": 1.2068794326241135,
+      "cer": 0.950594482280965,
+      "cs_wer": 1.2773892773892774,
+      "mono_wer": 1.2023108291798823,
+      "ru_word_acc": 0.02531645569620253,
+      "kz_word_acc": 0.10768872682132051,
+      "n_utts": 1081,
+      "n_ref_words": 14100
+    },
+    "test": {
+      "wer": 1.128549050323086,
+      "cer": 0.9155146940507014,
+      "cs_wer": 1.375,
+      "mono_wer": 1.108737042521684,
+      "ru_word_acc": 0.05223880597014925,
+      "kz_word_acc": 0.10545148389812671,
+      "n_utts": 1546,
+      "n_ref_words": 20428
+    },
+    "test_talkshow": {
+      "wer": 1.0609960717740183,
+      "cer": 0.8451591283768217,
+      "cs_wer": 1.1613554757630162,
+      "mono_wer": 1.051317014046707,
+      "ru_word_acc": 0.04672897196261682,
+      "kz_word_acc": 0.1508373943946713,
+      "n_utts": 4368,
+      "n_ref_words": 50659
+    },
+    "test_read": {
+      "wer": 0.8702754195735619,
+      "cer": 0.3679880068333159,
+      "cs_wer": 1.3210526315789475,
+      "mono_wer": 0.8678628771020535,
+      "ru_word_acc": 0.23529411764705882,
+      "kz_word_acc": 0.22829705128582792,
+      "n_utts": 3327,
+      "n_ref_words": 35691
+    }
+  }
+}

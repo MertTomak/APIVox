@@ -53,14 +53,25 @@ class SpeechDataset(Dataset):
 
 
 def collate(batch: list[tuple[np.ndarray, list[int]]]) -> dict[str, torch.Tensor]:
-    """Zero-pad waveforms (no attention mask, as for group-norm HuBERT) and pad labels with -100."""
+    """Zero-pad waveforms (no attention mask, as for group-norm HuBERT), keep true lengths, pad labels with -100."""
     width = max(len(w) for w, _ in batch)
     waves = torch.zeros(len(batch), width)
     labels = torch.full((len(batch), max(len(t) for _, t in batch)), IGNORE_INDEX, dtype=torch.long)
     for row, (wave, target) in enumerate(batch):
         waves[row, :len(wave)] = torch.from_numpy(wave)
         labels[row, :len(target)] = torch.tensor(target)
-    return {"input_values": waves, "labels": labels}
+    return {"input_values": waves, "lengths": torch.tensor([len(w) for w, _ in batch]), "labels": labels}
+
+
+def ctc_loss(model: HubertForCTC, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+    """CTC loss over each clip's own frame count, so padded frames are never aligned to text."""
+    labels = batch["labels"]
+    frames = model._get_feat_extract_output_lengths(batch["lengths"])
+    log_probs = torch.log_softmax(model(input_values=batch["input_values"]).logits.float(), dim=-1)
+    return torch.nn.functional.ctc_loss(
+        log_probs.transpose(0, 1), labels[labels != IGNORE_INDEX], frames, (labels != IGNORE_INDEX).sum(dim=-1),
+        blank=BLANK, reduction="mean", zero_infinity=True,
+    )
 
 
 def load_trainable(device: torch.device) -> tuple[Wav2Vec2FeatureExtractor, HubertForCTC]:
@@ -68,8 +79,8 @@ def load_trainable(device: torch.device) -> tuple[Wav2Vec2FeatureExtractor, Hube
     source = {"pretrained_model_name_or_path": CHECKPOINT, "revision": REVISION}
     extractor = Wav2Vec2FeatureExtractor.from_pretrained(**source)
     model = HubertForCTC.from_pretrained(
-        **source, vocab_size=len(data_io.CHARS) + 1, pad_token_id=BLANK, ctc_loss_reduction="mean",
-        ctc_zero_infinity=True, mask_time_prob=CONFIG["mask_time_prob"], dtype=torch.float32,
+        **source, vocab_size=len(data_io.CHARS) + 1, pad_token_id=BLANK, mask_time_prob=CONFIG["mask_time_prob"],
+        dtype=torch.float32,
     )
     model.freeze_feature_encoder()
     return extractor, model.to(device)
@@ -101,7 +112,7 @@ def train_epoch(model: HubertForCTC, loader: DataLoader, optimizer: torch.optim.
     for step, batch in enumerate(loader, start=1):
         batch = {k: v.to(model.device) for k, v in batch.items()}
         with torch.autocast("cuda", dtype=torch.float16, enabled=model.device.type == "cuda"):
-            loss = model(**batch).loss
+            loss = ctc_loss(model, batch)
         optimizer.zero_grad(set_to_none=True)
         scaler.scale(loss).backward()
         scaler.unscale_(optimizer)
@@ -125,7 +136,7 @@ def decode(model: HubertForCTC, extractor: Wav2Vec2FeatureExtractor, records: li
     for batch in make_batches([r["duration"] for r in records], CONFIG["eval_batch_seconds"]):
         waves = [dataset[i][0] for i in batch]
         items = collate([(w, [BLANK]) for w in waves])
-        lengths = model._get_feat_extract_output_lengths(torch.tensor([len(w) for w in waves]))
+        lengths = model._get_feat_extract_output_lengths(items["lengths"])
         with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16,
                                                      enabled=model.device.type == "cuda"):
             ids = model(input_values=items["input_values"].to(model.device)).logits.argmax(dim=-1).cpu()

@@ -7,8 +7,12 @@ from typing import Any
 import numpy as np
 import torch
 from transformers import AutoProcessor, Wav2Vec2ForCTC, WhisperForConditionalGeneration, WhisperProcessor
+from transformers.utils import logging as hf_logging
 
 from src import data_io, metrics
+
+# Per-batch generation warnings flood long runs; errors are still shown.
+hf_logging.set_verbosity_error()
 
 MODELS: dict[str, dict[str, str]] = {
     "whisper_small_zs": {

@@ -1,6 +1,7 @@
 """Fine-tune the Transformer encoder-decoder openai/whisper-small on our Kazakh train split."""
 import argparse
 import json
+import math
 import random
 import time
 from functools import partial
@@ -21,9 +22,10 @@ CONFIG = {
     "weight_decay": 0.0,
     "warmup_steps": 500,
     "batch_size": 16,
+    "micro_batch_size": 8,
     "epochs": 5,
     "grad_clip": 1.0,
-    "eval_batch_seconds": 480.0,
+    "eval_batch_seconds": 240.0,
     "language": "kazakh",
     "task": "transcribe",
     "decoding": "greedy",
@@ -87,33 +89,49 @@ def make_loader(records: list[dict], processor: WhisperProcessor, seed: int, wor
     """Shuffled train loader with a seeded generator and seeded workers."""
     start_id = processor.tokenizer.convert_tokens_to_ids("<|startoftranscript|>")
     return DataLoader(
-        SpeechDataset(records, processor), batch_size=CONFIG["batch_size"], shuffle=True, num_workers=workers,
+        SpeechDataset(records, processor), batch_size=CONFIG["micro_batch_size"], shuffle=True, num_workers=workers,
         collate_fn=partial(collate, start_id=start_id), generator=torch.Generator().manual_seed(seed),
         worker_init_fn=partial(seed_worker, seed=seed),
     )
 
 
+def accumulation() -> int:
+    """Micro-batches per optimizer step, so that micro_batch_size x accumulation = batch_size."""
+    return CONFIG["batch_size"] // CONFIG["micro_batch_size"]
+
+
+def optimizer_step(model: WhisperForConditionalGeneration, optimizer: torch.optim.Optimizer,
+                   scheduler: torch.optim.lr_scheduler.LRScheduler, scaler: torch.amp.GradScaler) -> None:
+    """Clip the accumulated gradients, update the weights and the schedule, and clear the gradients."""
+    scaler.unscale_(optimizer)
+    torch.nn.utils.clip_grad_norm_(model.parameters(), CONFIG["grad_clip"])
+    scaler.step(optimizer)
+    scaler.update()
+    scheduler.step()
+    optimizer.zero_grad(set_to_none=True)
+
+
 def train_epoch(model: WhisperForConditionalGeneration, loader: DataLoader, optimizer: torch.optim.Optimizer,
                 scheduler: torch.optim.lr_scheduler.LRScheduler, scaler: torch.amp.GradScaler,
                 max_steps: int | None) -> float:
-    """Run one epoch of teacher-forced cross-entropy with fp16 autocast on CUDA and return the mean loss."""
+    """Run one epoch of teacher-forced cross-entropy with gradient accumulation and return the mean loss."""
     model.train()
-    losses = []
-    for step, batch in enumerate(loader, start=1):
+    accum, losses, steps = accumulation(), [], 0
+    n_steps = math.ceil(len(loader) / accum)
+    optimizer.zero_grad(set_to_none=True)
+    for micro, batch in enumerate(loader, start=1):
         batch = {k: v.to(model.device) for k, v in batch.items()}
         with torch.autocast("cuda", dtype=torch.float16, enabled=model.device.type == "cuda"):
             loss = model(**batch).loss
-        optimizer.zero_grad(set_to_none=True)
-        scaler.scale(loss).backward()
-        scaler.unscale_(optimizer)
-        torch.nn.utils.clip_grad_norm_(model.parameters(), CONFIG["grad_clip"])
-        scaler.step(optimizer)
-        scaler.update()
-        scheduler.step()
+        scaler.scale(loss / accum).backward()
         losses.append(loss.item())
-        if step % 100 == 0:
-            print(f"  step {step}/{len(loader)}  loss {np.mean(losses[-100:]):.4f}", flush=True)
-        if max_steps and step >= max_steps:
+        if micro % accum and micro != len(loader):
+            continue
+        optimizer_step(model, optimizer, scheduler, scaler)
+        steps += 1
+        if steps % 100 == 0:
+            print(f"  step {steps}/{n_steps}  loss {np.mean(losses[-100 * accum:]):.4f}", flush=True)
+        if max_steps and steps >= max_steps:
             break
     return float(np.mean(losses))
 
@@ -130,7 +148,8 @@ def fit(model: WhisperForConditionalGeneration, processor: WhisperProcessor, tra
         max_steps: int | None = None) -> tuple[dict, int, list[dict]]:
     """Train, score dev WER after every epoch and return the best weights, the best epoch and the dev curve."""
     loader = make_loader(train, processor, seed, workers)
-    total = epochs * (min(len(loader), max_steps) if max_steps else len(loader))
+    steps_per_epoch = math.ceil(len(loader) / accumulation())
+    total = epochs * (min(steps_per_epoch, max_steps) if max_steps else steps_per_epoch)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=CONFIG["weight_decay"])
     scheduler = get_linear_schedule_with_warmup(optimizer, min(CONFIG["warmup_steps"], total), total)
     scaler = torch.amp.GradScaler("cuda", enabled=model.device.type == "cuda")

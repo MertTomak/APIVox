@@ -1,0 +1,123 @@
+{
+  "model": "ctc",
+  "seed": 42,
+  "checkpoint": null,
+  "revision": null,
+  "config": {
+    "head": "ctc",
+    "seed": 42,
+    "final": true,
+    "features": "logmel",
+    "no_aug": false,
+    "max_hours": null,
+    "max_minutes": 30.0,
+    "epochs": 40,
+    "patience": 6,
+    "lr": 0.001,
+    "weight_decay": 0.01,
+    "batch_frames": 20000,
+    "workers": 2,
+    "device": "auto",
+    "hidden": 256,
+    "layers": 4,
+    "dropout": 0.2,
+    "warmup_steps": 1000,
+    "planned_epochs": 5,
+    "stopped_by": "time_budget",
+    "n_train_clips": 22309,
+    "n_train_dropped": 502,
+    "dev_curve": [
+      {
+        "epoch": 1,
+        "train_loss": 3.6409,
+        "dev_wer": 1.0,
+        "dev_cer": 1.0,
+        "lr": 0.0005620000000000001,
+        "time_s": 312.5,
+        "peak_mem_gb": 0.41
+      },
+      {
+        "epoch": 2,
+        "train_loss": 3.2542,
+        "dev_wer": 1.0,
+        "dev_cer": 0.9648662546042207,
+        "lr": 0.000988770185430327,
+        "time_s": 305.2,
+        "peak_mem_gb": 0.41
+      },
+      {
+        "epoch": 3,
+        "train_loss": 2.8771,
+        "dev_wer": 1.0046808510638299,
+        "dev_cer": 0.7643373595122412,
+        "lr": 0.0006864064145515969,
+        "time_s": 308.0,
+        "peak_mem_gb": 0.41
+      },
+      {
+        "epoch": 4,
+        "train_loss": 2.763,
+        "dev_wer": 1.0019148936170212,
+        "dev_cer": 0.7239356510971425,
+        "lr": 0.00022000286365374955,
+        "time_s": 306.4,
+        "peak_mem_gb": 0.41
+      },
+      {
+        "epoch": 5,
+        "train_loss": 2.7152,
+        "dev_wer": 1.0024113475177305,
+        "dev_cer": 0.7153830816534268,
+        "lr": 0.0,
+        "time_s": 305.7,
+        "peak_mem_gb": 0.41
+      }
+    ]
+  },
+  "train_time_s": 1537.7,
+  "hardware": "Tesla T4",
+  "n_params": 6064171,
+  "best_epoch": 2,
+  "splits": {
+    "dev": {
+      "wer": 1.0,
+      "cer": 0.9648662546042207,
+      "cs_wer": 1.0,
+      "mono_wer": 1.0,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 0.0,
+      "n_utts": 1081,
+      "n_ref_words": 14100
+    },
+    "test": {
+      "wer": 0.9999510475817506,
+      "cer": 0.9657480142186334,
+      "cs_wer": 1.0,
+      "mono_wer": 0.9999471123334038,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 5.2620500947169015e-05,
+      "n_utts": 1546,
+      "n_ref_words": 20428
+    },
+    "test_talkshow": {
+      "wer": 0.9999210406837877,
+      "cer": 0.9611551430614522,
+      "cs_wer": 0.9995511669658886,
+      "mono_wer": 0.9999567127675693,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 8.512268306697027e-05,
+      "n_utts": 4368,
+      "n_ref_words": 50659
+    },
+    "test_read": {
+      "wer": 0.9999719817320893,
+      "cer": 0.9588567754031617,
+      "cs_wer": 1.0,
+      "mono_wer": 0.9999718317793865,
+      "ru_word_acc": 0.0,
+      "kz_word_acc": 2.945768403688102e-05,
+      "n_utts": 3327,
+      "n_ref_words": 35691
+    }
+  }
+}

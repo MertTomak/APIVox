@@ -135,6 +135,20 @@ def test_build_model_rejects_unknown_head():
         models.build_model("transformer", in_dim=80, n_chars=10)
 
 
+@pytest.mark.parametrize("budget_s, epoch_s, expected", [(None, 99.0, 40), (600.0, 100.0, 6), (50.0, 100.0, 1),
+                                                         (1e6, 1.0, 40)])
+def test_planned_epochs_fit_the_budget(budget_s, epoch_s, expected):
+    assert train_scratch.planned_epochs(40, budget_s, epoch_s) == expected
+
+
+def test_shortened_cosine_reaches_zero_at_the_new_total():
+    schedule = train_scratch.WarmupCosine(warmup=10, total=1000)
+    assert schedule(0) == pytest.approx(0.1) and schedule(9) == pytest.approx(1.0)
+    schedule.total = 110
+    assert schedule(60) == pytest.approx(0.5)
+    assert schedule(110) == pytest.approx(0.0, abs=1e-12) and schedule(500) == pytest.approx(0.0, abs=1e-12)
+
+
 def small_aed(n_chars: int = 10, max_len: int = 12) -> models.AEDModel:
     torch.manual_seed(0)
     return models.build_model("aed", in_dim=80, n_chars=n_chars, max_len=max_len, hidden=32, layers=2,

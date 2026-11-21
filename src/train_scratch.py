@@ -19,6 +19,7 @@ TRAINED_SEEDS = (13, 42, 2026)
 INT16_SCALE = 32767.0
 GRAD_CLIP = 5.0
 WARMUP_MAX_STEPS = 1000
+MAX_EPOCHS = 40
 # The RNN-T joint tensor is [B, T, U + 1, J], so its batches are smaller to fit a 15 GB GPU.
 DEFAULT_BATCH_FRAMES = {"ctc": 20000, "aed": 20000, "rnnt": 6000}
 
@@ -41,7 +42,10 @@ def parse_args() -> argparse.Namespace:
                         help="input features (default: logmel; mfcc is the ctc-mfcc ablation)")
     parser.add_argument("--no-aug", action="store_true", help="disable speed, noise and SpecAugment (ablation)")
     parser.add_argument("--max-hours", type=float, default=None, help="debug: use only the first N hours of train")
-    parser.add_argument("--epochs", type=int, default=40, help="maximum number of epochs (default: 40)")
+    parser.add_argument("--max-minutes", type=float, default=None,
+                        help="training time budget; after epoch 1 the epochs and the cosine decay are fitted to it")
+    parser.add_argument("--epochs", type=int, default=MAX_EPOCHS,
+                        help=f"maximum number of epochs (default: {MAX_EPOCHS})")
     parser.add_argument("--patience", type=int, default=6, help="epochs without dev improvement before stopping")
     parser.add_argument("--lr", type=float, default=1e-3, help="peak AdamW learning rate (default: 1e-3)")
     parser.add_argument("--weight-decay", type=float, default=0.01, help="AdamW weight decay (default: 0.01)")
@@ -175,13 +179,25 @@ def make_batches(n_frames: list[int], max_frames: int, rng: np.random.Generator 
     return batches
 
 
-def warmup_cosine(warmup: int, total: int):
-    """Learning-rate factor: s / warmup during warmup, then 0.5 * (1 + cos(pi * progress)) down to 0."""
-    def factor(step: int) -> float:
-        if step < warmup:
-            return (step + 1) / warmup
-        return 0.5 * (1.0 + math.cos(math.pi * min(1.0, (step - warmup) / max(1, total - warmup))))
-    return factor
+class WarmupCosine:
+    """Learning-rate factor: s / warmup during warmup, then 0.5 * (1 + cos(pi * progress)) down to 0 at total."""
+
+    def __init__(self, warmup: int, total: int) -> None:
+        self.warmup = warmup
+        self.total = total
+
+    def __call__(self, step: int) -> float:
+        if step < self.warmup:
+            return (step + 1) / self.warmup
+        progress = (step - self.warmup) / max(1, self.total - self.warmup)
+        return 0.5 * (1.0 + math.cos(math.pi * min(1.0, progress)))
+
+
+def planned_epochs(max_epochs: int, budget_s: float | None, epoch_s: float) -> int:
+    """Epochs that fit the time budget at the measured epoch time, between 1 and max_epochs."""
+    if budget_s is None:
+        return max_epochs
+    return max(1, min(max_epochs, int(budget_s // epoch_s)))
 
 
 def train_epoch(model: torch.nn.Module, loader: DataLoader, optimizer: torch.optim.Optimizer,
@@ -220,14 +236,18 @@ def transcribe(model: torch.nn.Module, dataset: Utterances, device: torch.device
 
 
 def fit(args: argparse.Namespace, model: torch.nn.Module, train_set: Utterances, dev_records: list[dict],
-        dev_set: Utterances, device: torch.device) -> tuple[dict, int, list[dict], float, int]:
-    """Train with early stopping on (dev WER, dev CER); return best weights, best epoch, curve, time and warmup."""
-    total_steps = args.epochs * len(make_batches(train_set.n_frames, args.batch_frames))
-    warmup = min(WARMUP_MAX_STEPS, max(1, total_steps // 10))
+        dev_set: Utterances, device: torch.device) -> tuple[dict, int, list[dict], float, dict]:
+    """Train with early stopping on (dev WER, dev CER) within the time budget; return weights, epoch, curve, time, plan."""
+    n_batches = len(make_batches(train_set.n_frames, args.batch_frames))
+    # Warmup does not depend on --epochs, so an --epochs N run repeats the schedule of a budget run planned to N.
+    warmup = min(WARMUP_MAX_STEPS, max(1, MAX_EPOCHS * n_batches // 10))
+    schedule = WarmupCosine(warmup, args.epochs * n_batches)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, warmup_cosine(warmup, total_steps))
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, schedule)
     scaler = torch.amp.GradScaler(device.type, enabled=device.type == "cuda")
+    budget_s = args.max_minutes * 60 if args.max_minutes else None
     best_key, best_state, best_epoch, waited, curve = None, {}, 0, 0, []
+    plan = {"warmup_steps": warmup, "planned_epochs": args.epochs, "stopped_by": "max_epochs"}
     start = time.time()
     for epoch in range(1, args.epochs + 1):
         tick = time.time()
@@ -251,8 +271,20 @@ def fit(args: argparse.Namespace, model: torch.nn.Module, train_set: Utterances,
             waited += 1
             if waited >= args.patience:
                 print(f"early stop: no dev improvement for {args.patience} epochs")
+                plan["stopped_by"] = "patience"
                 break
-    return best_state, best_epoch, curve, time.time() - start, warmup
+        if epoch == 1 and budget_s is not None:
+            plan["planned_epochs"] = planned_epochs(args.epochs, budget_s, curve[0]["time_s"])
+            # The cosine decay is shortened so that it still ends at 0 within the budget.
+            schedule.total = max(plan["planned_epochs"] * n_batches, warmup + 1)
+            print(f"time budget {args.max_minutes} min: {plan['planned_epochs']} epochs planned", flush=True)
+        elapsed = time.time() - start
+        if epoch >= plan["planned_epochs"] or (budget_s is not None and elapsed + curve[-1]["time_s"] > budget_s):
+            if epoch < args.epochs:
+                print(f"stop after epoch {epoch}: time budget of {args.max_minutes} min")
+                plan["stopped_by"] = "time_budget"
+            break
+    return best_state, best_epoch, curve, time.time() - start, plan
 
 
 def print_curve(curve: list[dict], best_epoch: int) -> None:
@@ -293,7 +325,7 @@ def main() -> None:
     dev_set = Utterances(dev_records, args.features)
     max_len = 2 * max(len(t) for t in train_set.targets)
     model = models.build_model(args.head, models.FEATURE_DIMS[args.features], max_len=max_len).to(device)
-    best_state, best_epoch, curve, train_time, warmup = fit(args, model, train_set, dev_records, dev_set, device)
+    best_state, best_epoch, curve, train_time, plan = fit(args, model, train_set, dev_records, dev_set, device)
     print_curve(curve, best_epoch)
     if not args.final:
         print("without --final nothing is written")
@@ -303,7 +335,7 @@ def main() -> None:
     torch.save({"state_dict": best_state, "args": vars(args), "max_len": max_len, "best_epoch": best_epoch},
                CHECKPOINT_DIR / f"{name}_seed{args.seed}.pt")
     config = {**vars(args), "hidden": models.HIDDEN, "layers": models.LAYERS, "dropout": models.DROPOUT,
-              "warmup_steps": warmup, "n_train_clips": len(train_records), "n_train_dropped": n_dropped,
+              **plan, "n_train_clips": len(train_records), "n_train_dropped": n_dropped,
               "dev_curve": curve}
     if args.head == "aed":
         config.update(max_decode_len=max_len, label_smoothing=models.LABEL_SMOOTHING,

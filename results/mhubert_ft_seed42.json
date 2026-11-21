@@ -1,0 +1,131 @@
+{
+  "model": "mhubert_ft",
+  "seed": 42,
+  "checkpoint": "utter-project/mHuBERT-147",
+  "revision": "7ad3fc0bc5106c58c9c13526abccad527150d135",
+  "config": {
+    "head_lr": 0.001,
+    "encoder_lr": 3e-05,
+    "weight_decay": 0.0,
+    "warmup_ratio": 0.1,
+    "batch_seconds": 100.0,
+    "epochs": 10,
+    "grad_clip": 1.0,
+    "mask_time_prob": 0.05,
+    "eval_batch_seconds": 160.0,
+    "decoding": "greedy CTC with src.models.ctc_collapse",
+    "architecture": "HuBERT base + CTC head over data_io.CHARS (blank = 0)",
+    "initialized_from": "utter-project/mHuBERT-147",
+    "precision": "fp16 autocast",
+    "frozen": "convolutional feature encoder",
+    "ksc_training": "not stated: the model card and its pre-training manifests (CommonVoice v11, MLS, VoxLingua107, VoxPopuli and others) name neither KSC nor KSC2",
+    "dev_curve": [
+      {
+        "epoch": 1,
+        "train_loss": 4.1130412483462395,
+        "dev_wer": 0.8327659574468085,
+        "dev_cer": 0.2773865866328062
+      },
+      {
+        "epoch": 2,
+        "train_loss": 1.18821863153232,
+        "dev_wer": 0.6411347517730497,
+        "dev_cer": 0.19654119400165804
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.9710875794111344,
+        "dev_wer": 0.587304964539007,
+        "dev_cer": 0.17970889782040653
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.8787718435077058,
+        "dev_wer": 0.5592198581560284,
+        "dev_cer": 0.16869025007083416
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.8203785739620321,
+        "dev_wer": 0.535886524822695,
+        "dev_cer": 0.1642827909710052
+      },
+      {
+        "epoch": 6,
+        "train_loss": 0.7834216470545438,
+        "dev_wer": 0.5263120567375886,
+        "dev_cer": 0.16069385998971594
+      },
+      {
+        "epoch": 7,
+        "train_loss": 0.7440229865733617,
+        "dev_wer": 0.5217730496453901,
+        "dev_cer": 0.15873149129526828
+      },
+      {
+        "epoch": 8,
+        "train_loss": 0.7247683540089555,
+        "dev_wer": 0.5084397163120568,
+        "dev_cer": 0.1553944151196835
+      },
+      {
+        "epoch": 9,
+        "train_loss": 0.7022810812930164,
+        "dev_wer": 0.5032624113475177,
+        "dev_cer": 0.15397773183759564
+      },
+      {
+        "epoch": 10,
+        "train_loss": 0.6883220194946711,
+        "dev_wer": 0.5026950354609929,
+        "dev_cer": 0.15376785283284186
+      }
+    ]
+  },
+  "train_time_s": 4396.7,
+  "hardware": "Tesla T4",
+  "n_params": 94404779,
+  "best_epoch": 10,
+  "splits": {
+    "dev": {
+      "wer": 0.5026950354609929,
+      "cer": 0.15376785283284186,
+      "cs_wer": 0.578088578088578,
+      "mono_wer": 0.4978099984896541,
+      "ru_word_acc": 0.0759493670886076,
+      "kz_word_acc": 0.5745984948405617,
+      "n_utts": 1081,
+      "n_ref_words": 14100
+    },
+    "test": {
+      "wer": 0.4831603681221852,
+      "cer": 0.1413817820102105,
+      "cs_wer": 0.5296052631578947,
+      "mono_wer": 0.47942669769409774,
+      "ru_word_acc": 0.1044776119402985,
+      "kz_word_acc": 0.5642496316564933,
+      "n_utts": 1546,
+      "n_ref_words": 20428
+    },
+    "test_talkshow": {
+      "wer": 0.41477328806332536,
+      "cer": 0.12101655461707163,
+      "cs_wer": 0.5049371633752244,
+      "mono_wer": 0.40607752743328357,
+      "ru_word_acc": 0.1233644859813084,
+      "kz_word_acc": 0.6466770232597732,
+      "n_utts": 4368,
+      "n_ref_words": 50659
+    },
+    "test_read": {
+      "wer": 0.42237538875346725,
+      "cer": 0.08899580471591767,
+      "cs_wer": 0.5263157894736842,
+      "mono_wer": 0.4218191036872201,
+      "ru_word_acc": 0.058823529411764705,
+      "kz_word_acc": 0.6238253748490293,
+      "n_utts": 3327,
+      "n_ref_words": 35691
+    }
+  }
+}

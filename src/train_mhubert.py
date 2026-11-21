@@ -20,7 +20,7 @@ REVISION = "7ad3fc0bc5106c58c9c13526abccad527150d135"
 KSC_TRAINING = ("not stated: the model card and its pre-training manifests (CommonVoice v11, MLS, VoxLingua107, "
                 "VoxPopuli and others) name neither KSC nor KSC2")
 CONFIG = {
-    "head_lr": 1e-4,
+    "head_lr": 1e-3,
     "encoder_lr": 3e-5,
     "weight_decay": 0.0,
     "warmup_ratio": 0.1,
@@ -28,10 +28,10 @@ CONFIG = {
     "epochs": 10,
     "grad_clip": 1.0,
     "mask_time_prob": 0.05,
-    "eval_batch_seconds": 300.0,
+    "eval_batch_seconds": 160.0,
     "decoding": "greedy CTC with src.models.ctc_collapse",
 }
-SWEEP_ENCODER_LRS = (1e-5, 3e-5, 5e-5)
+SWEEP_ENCODER_LRS = (3e-5, 5e-5)
 SWEEP_SEED = 42
 IGNORE_INDEX = -100
 

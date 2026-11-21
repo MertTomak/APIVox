@@ -11,6 +11,7 @@ from src import data_io
 RESULTS_DIR = Path(__file__).resolve().parents[1] / "results"
 SLICE_DIMENSIONS = ("source", "program", "cs")
 RU_TAGS = ("ru", "mix")
+KZ_TAGS = ("kz",)
 CI_METRICS = ("wer", "cer", "cs_wer")
 
 
@@ -55,10 +56,10 @@ def _edits(alignment: list) -> int:
     return total
 
 
-def _ru_hits(alignment: list, tags: list[str]) -> int:
-    """Count reference words tagged ru or mix that the alignment marks as equal."""
+def _tag_hits(alignment: list, tags: list[str], wanted: tuple[str, ...]) -> int:
+    """Count reference words with a wanted tag that the alignment marks as equal."""
     return sum(
-        tags[i] in RU_TAGS
+        tags[i] in wanted
         for chunk in alignment if chunk.type == "equal"
         for i in range(chunk.ref_start_idx, chunk.ref_end_idx)
     )
@@ -77,8 +78,10 @@ def _counts(records: list[dict], hyps: list[str]) -> dict[str, np.ndarray]:
         "words": np.array([len(ref.split()) for ref in refs], dtype=float),
         "char_edits": np.array([_edits(a) for a in chars.alignments], dtype=float),
         "chars": np.array([len(ref) for ref in refs], dtype=float),
-        "ru_hits": np.array([_ru_hits(a, t) for a, t in zip(words.alignments, tags)], dtype=float),
+        "ru_hits": np.array([_tag_hits(a, t, RU_TAGS) for a, t in zip(words.alignments, tags)], dtype=float),
         "ru_words": np.array([sum(t in RU_TAGS for t in ts) for ts in tags], dtype=float),
+        "kz_hits": np.array([_tag_hits(a, t, KZ_TAGS) for a, t in zip(words.alignments, tags)], dtype=float),
+        "kz_words": np.array([sum(t in KZ_TAGS for t in ts) for ts in tags], dtype=float),
         "cs": np.array([bool(r["cs"]) for r in records]),
     }
 
@@ -98,6 +101,7 @@ def _metrics(c: dict[str, np.ndarray]) -> dict[str, Any]:
         "cs_wer": _ratio(c["word_edits"], c["words"], c["cs"]),
         "mono_wer": _ratio(c["word_edits"], c["words"], ~c["cs"]),
         "ru_word_acc": _ratio(c["ru_hits"], c["ru_words"]),
+        "kz_word_acc": _ratio(c["kz_hits"], c["kz_words"]),
         "n_utts": int(len(c["words"])),
         "n_ref_words": int(c["words"].sum()),
     }
@@ -164,6 +168,34 @@ def paired_bootstrap(
     idx = _resample_indices(len(records), n, seed)
     wer_a = _resampled_ratio(a["word_edits"], a["words"], idx)
     wer_b = _resampled_ratio(b["word_edits"], b["words"], idx)
+    return float(((wer_a < wer_b).sum() + 0.5 * (wer_a == wer_b).sum()) / n)
+
+
+def _pooled_wer(records: list[dict], hyps_by_seed: list[list[str]], idx: np.ndarray) -> np.ndarray:
+    """Per-resample WER averaged over seeds, every seed using the same utterance indices."""
+    if not hyps_by_seed:
+        raise ValueError("need the hypotheses of at least one seed")
+    wers = []
+    for hyps in hyps_by_seed:
+        c = _counts(records, hyps)
+        wers.append(_resampled_ratio(c["word_edits"], c["words"], idx))
+    return np.mean(wers, axis=0)
+
+
+def pooled_bootstrap_ci(
+    records: list[dict], hyps_by_seed: list[list[str]], n: int = 1000, seed: int = 0
+) -> list[float] | None:
+    """95 % percentile CI of the seed-averaged WER, resampling utterances once for all seeds."""
+    idx = _resample_indices(len(records), n, seed)
+    return _percentile_ci(_pooled_wer(records, hyps_by_seed, idx))
+
+
+def pooled_paired_bootstrap(
+    records: list[dict], hyps_a: list[list[str]], hyps_b: list[list[str]], n: int = 1000, seed: int = 0
+) -> float:
+    """Probability that A has lower seed-averaged WER than B on shared resamples, ties counting half."""
+    idx = _resample_indices(len(records), n, seed)
+    wer_a, wer_b = _pooled_wer(records, hyps_a, idx), _pooled_wer(records, hyps_b, idx)
     return float(((wer_a < wer_b).sum() + 0.5 * (wer_a == wer_b).sum()) / n)
 
 

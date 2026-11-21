@@ -87,6 +87,19 @@ def test_ru_word_acc_is_none_without_russian_words():
     assert metrics.evaluate([rec("мен барамын")], ["мен барамын"])["ru_word_acc"] is None
 
 
+def test_kz_word_acc_on_hand_aligned_code_switched_pair():
+    # kz words: мен, бардым; only бардым is kept (мен -> мин), ru/mix words do not count.
+    record = rec("мен вчера магазинге бардым", ["kz", "ru", "mix", "kz"], cs=True)
+    out = metrics.evaluate([record], ["мин вчера магазинге бардым"])
+    assert out["kz_word_acc"] == 0.5
+    assert out["ru_word_acc"] == 1.0
+    assert metrics.slices([record], ["мин вчера магазинге бардым"])["cs"]["true"]["kz_word_acc"] == 0.5
+
+
+def test_kz_word_acc_is_none_without_kazakh_words():
+    assert metrics.evaluate([rec("вчера", ["ru"])], ["вчера"])["kz_word_acc"] is None
+
+
 def test_corpus_wer_differs_from_mean_of_utterance_wers():
     # Utterance 1: 1 error / 1 word (WER 1.0); utterance 2: 0 errors / 9 words (WER 0.0).
     long = "бұл сөйлем тоғыз сөзден тұрады және оны дұрыс таныдық"
@@ -182,6 +195,31 @@ def test_paired_bootstrap():
     assert metrics.paired_bootstrap(records, good, bad, n=100) == 1.0
     assert metrics.paired_bootstrap(records, bad, good, n=100) == 0.0
     assert metrics.paired_bootstrap(records, good, good, n=100) == 0.5
+
+
+def test_pooled_bootstrap_with_one_seed_matches_plain_bootstrap():
+    records = [rec("мен барамын", id="a"), rec("ол келді", id="b"), rec("біз бардық", id="c")]
+    hyps = ["мен барамын", "ол келмеді", "біз бардық"]
+    assert metrics.pooled_bootstrap_ci(records, [hyps]) == metrics.bootstrap_ci(records, hyps)["wer"]
+    assert metrics.pooled_paired_bootstrap(records, [hyps], [hyps]) == metrics.paired_bootstrap(records, hyps, hyps)
+
+
+def test_pooled_bootstrap_averages_seeds_per_resample():
+    # One utterance, two seeds with WER 0 and 1: the mean is 0.5 on every resample.
+    records = [rec("мен барамын")]
+    assert metrics.pooled_bootstrap_ci(records, [["мен барамын"], ["ол келді"]]) == [0.5, 0.5]
+
+
+def test_pooled_paired_bootstrap_orders_systems():
+    records = [rec("мен барамын", id="a"), rec("ол келді", id="b")]
+    good, bad = [["мен барамын", "ол келді"]] * 2, [["ол келді", "мен барамын"]] * 2
+    assert metrics.pooled_paired_bootstrap(records, good, bad) == 1.0
+    assert metrics.pooled_paired_bootstrap(records, bad, good) == 0.0
+
+
+def test_pooled_bootstrap_needs_a_seed():
+    with pytest.raises(ValueError):
+        metrics.pooled_bootstrap_ci([rec("мен барамын")], [])
 
 
 def test_validate_preds_accepts_exact_ids(fake_split):

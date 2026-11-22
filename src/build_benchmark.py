@@ -3,10 +3,14 @@ import argparse
 import csv
 import json
 import math
+import os
 import re
 import sys
+import tempfile
+from collections import Counter
 from pathlib import Path
 
+import jiwer
 import matplotlib
 
 matplotlib.use("Agg")
@@ -43,13 +47,30 @@ BENCHMARK_COLUMNS = ["model", "group", "checkpoint", "revision", "split", "wer",
                      "mono_wer", "ru_word_acc", "kz_word_acc", "n_seeds", "train_time", "contamination", "compared_with", "p_lower_wer"]
 ABLATION_COLUMNS = ["model", "split", "wer", "wer_std", "wer_ci", "cer", "cs_wer", "mono_wer", "n_seeds",
                     "delta_wer_vs_ctc"]
+ERROR_SPLITS = ("test", "test_talkshow")
+ERROR_BASELINE = ("whisper_small_zs", 0)
+ERROR_SEED = 42
+# Kazakh-specific letters and the Russian letters they are confused with.
+KZ_CONFUSIONS = str.maketrans("қғңүұөәіһ", "кгнууоаих")
+SUFFIX_SPAN = 4
+MIN_STEM = 3
+ERROR_TYPES = ("ru_mix_substitution", "ru_mix_deletion", "kz_suffix_only", "kz_letter_confusion",
+               "other_substitution", "other_deletion", "insertion")
+N_EXAMPLES = 20
+EXAMPLES_DIR = Path(tempfile.gettempdir()) / "aralas_errors"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--final", action="store_true",
                         help="include test, test_talkshow and test_read and write the tables and figures")
-    return parser.parse_args()
+    parser.add_argument("--errors", action="store_true",
+                        help="with --final: count error types on test and test_talkshow for the best model and "
+                             "whisper_small_zs and dump examples to the system temp directory")
+    args = parser.parse_args()
+    if args.errors and not args.final:
+        parser.error("--errors reads the final splits; add --final")
+    return args
 
 
 def discover_runs() -> dict[tuple[str, int], dict]:
@@ -318,6 +339,113 @@ def figure_read_vs_spont(agg: dict) -> None:
     _save(fig, "read_vs_spont.svg")
 
 
+def best_model(agg: dict) -> str:
+    """The model with the lowest mean test WER among the benchmark models."""
+    present = [m for m in LADDER if (m, "test") in agg]
+    if not present:
+        sys.exit("error: --errors needs at least one run with test scores")
+    return min(present, key=lambda m: agg[(m, "test")]["wer"])
+
+
+def error_seed(scores: dict, model: str) -> int:
+    """Seed 42 when the model has it, otherwise its only seed (zero-shot models use seed 0)."""
+    seeds = sorted({s for (m, s, sp) in scores if m == model and sp in ERROR_SPLITS})
+    if not seeds:
+        sys.exit(f"error: --errors found no test or test_talkshow scores for {model}")
+    return ERROR_SEED if ERROR_SEED in seeds else seeds[0]
+
+
+def is_suffix_only(ref: str, hyp: str) -> bool:
+    """True if the words share a stem and differ only within the last SUFFIX_SPAN characters."""
+    stem = len(os.path.commonprefix([ref, hyp]))
+    return stem >= MIN_STEM and stem >= max(len(ref), len(hyp)) - SUFFIX_SPAN
+
+
+def substitution_type(ref: str, hyp: str, tag: str) -> str:
+    """Classify one substituted reference word by its language tag and its spelling."""
+    if tag in metrics.RU_TAGS:
+        return "ru_mix_substitution"
+    if ref.translate(KZ_CONFUSIONS) == hyp.translate(KZ_CONFUSIONS):
+        return "kz_letter_confusion"
+    if is_suffix_only(ref, hyp):
+        return "kz_suffix_only"
+    return "other_substitution"
+
+
+def utterance_errors(record: dict, hyp: str) -> list[tuple[str, str, str]]:
+    """Every word error of one utterance as (type, reference word, hypothesis word)."""
+    ref_words, hyp_words, tags = record["text"].split(), hyp.split(), record["lang_tags"]
+    if not hyp_words:
+        return [("ru_mix_deletion" if t in metrics.RU_TAGS else "other_deletion", w, "") for w, t in zip(ref_words, tags)]
+    errors = []
+    for chunk in jiwer.process_words(record["text"], hyp).alignments[0]:
+        refs = range(chunk.ref_start_idx, chunk.ref_end_idx)
+        if chunk.type == "substitute":
+            errors += [(substitution_type(ref_words[i], hyp_words[j], tags[i]), ref_words[i], hyp_words[j])
+                       for i, j in zip(refs, range(chunk.hyp_start_idx, chunk.hyp_end_idx))]
+        elif chunk.type == "delete":
+            errors += [("ru_mix_deletion" if tags[i] in metrics.RU_TAGS else "other_deletion", ref_words[i], "")
+                       for i in refs]
+        elif chunk.type == "insert":
+            errors += [("insertion", "", hyp_words[j]) for j in range(chunk.hyp_start_idx, chunk.hyp_end_idx)]
+    return errors
+
+
+def error_counts(records: list[dict], hyps: list[str]) -> tuple[Counter, dict[str, list[dict]]]:
+    """Count error types over a split and keep the first examples of each type in record order."""
+    counts: Counter = Counter()
+    examples: dict[str, list[dict]] = {t: [] for t in ERROR_TYPES}
+    for record, raw in zip(records, hyps):
+        hyp = data_io.normalize_text(raw)
+        for kind, ref_word, hyp_word in utterance_errors(record, hyp):
+            counts[kind] += 1
+            if len(examples[kind]) < N_EXAMPLES:
+                examples[kind].append({"id": record["id"], "ref_word": ref_word, "hyp_word": hyp_word,
+                                       "ref": record["text"], "hyp": hyp})
+    return counts, examples
+
+
+def print_error_counts(model: str, seed: int, split: str, counts: Counter, n_words: int, word_edits: float) -> None:
+    """Print the count and the share of all word errors for every error type."""
+    total = sum(counts.values())
+    print(f"\n{model} seed {seed} {split}: {total} word errors over {n_words} reference words "
+          f"(WER numerator from metrics: {word_edits:.0f})")
+    for kind in ERROR_TYPES:
+        share = counts[kind] / total if total else 0.0
+        print(f"  {kind:<22}{counts[kind]:>7}  {share:.4f}")
+    other = counts["other_substitution"] + counts["other_deletion"] + counts["insertion"]
+    print(f"  {'other (all three)':<22}{other:>7}  {(other / total if total else 0.0):.4f}")
+
+
+def dump_examples(model: str, seed: int, split: str, counts: Counter, examples: dict[str, list[dict]]) -> Path:
+    """Write the examples of the three largest error types outside the repository."""
+    EXAMPLES_DIR.mkdir(parents=True, exist_ok=True)
+    path = EXAMPLES_DIR / f"{model}_seed{seed}_{split}.jsonl"
+    largest = [kind for kind, _ in counts.most_common(3)]
+    lines = [json.dumps({"type": kind, **ex}, ensure_ascii=False) for kind in largest for ex in examples[kind]]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def run_errors(agg: dict, scores: dict, records: dict[str, list[dict]]) -> None:
+    """Error-type counts on test and test_talkshow for the best model and whisper_small_zs."""
+    best = best_model(agg)
+    targets = [(best, error_seed(scores, best))]
+    if ERROR_BASELINE[0] != best and (ERROR_BASELINE[0], ERROR_BASELINE[1], "test") in scores:
+        targets.append(ERROR_BASELINE)
+    print(f"\nError analysis: best model by mean test WER is {best}")
+    for model, seed in targets:
+        for split in ERROR_SPLITS:
+            if (model, seed, split) not in scores:
+                print(f"\n{model} seed {seed} {split}: no predictions, skipped")
+                continue
+            score = scores[(model, seed, split)]
+            counts, examples = error_counts(records[split], score["hyps"])
+            edits = score["metrics"]["wer"] * score["metrics"]["n_ref_words"]
+            print_error_counts(model, seed, split, counts, score["metrics"]["n_ref_words"], edits)
+            print(f"  examples of the three largest types: {dump_examples(model, seed, split, counts, examples)}")
+
+
 def main() -> None:
     args = parse_args()
     splits = ("dev",) + (FINAL_ONLY_SPLITS if args.final else ())
@@ -331,6 +459,9 @@ def main() -> None:
     print(f"Rescored {len(scores)} run-split pairs; every stored number matches.")
     agg = {(m, s): a for m in set(EXPECTED) | set(ABLATIONS) for s in splits
            if (a := aggregate(runs, scores, records, m, s))}
+    if args.errors:
+        run_errors(agg, scores, records)
+        return
     rows = benchmark_rows(agg, splits, paired_table(scores, records) if args.final else {})
     if not args.final:
         for r in rows:

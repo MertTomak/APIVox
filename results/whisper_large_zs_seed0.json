@@ -1,0 +1,47 @@
+{
+  "model": "whisper_large_zs",
+  "seed": 0,
+  "checkpoint": "openai/whisper-large-v3",
+  "revision": "06f233fe06e710322aca913c1bc4249a0d71fce1",
+  "config": {
+    "architecture": "Transformer encoder-decoder",
+    "family": "whisper",
+    "adapter": null,
+    "language": "kk",
+    "decoding": "greedy",
+    "dtype": "float16",
+    "batch_seconds": 160.0,
+    "ksc_training": "not stated: the model card describes 1M hours of weakly labeled and 4M hours of pseudo-labeled web audio and names no datasets",
+    "rtf": {
+      "test": 0.11114121041202929,
+      "test_read": 0.08618328442262466
+    },
+    "decode_time_s": 3337.3
+  },
+  "train_time_s": 0.0,
+  "hardware": "Tesla T4",
+  "n_params": 1543490560,
+  "best_epoch": null,
+  "splits": {
+    "test": {
+      "wer": 0.6271294301938516,
+      "cer": 0.2696639897017305,
+      "cs_wer": 0.675,
+      "mono_wer": 0.6232811508356252,
+      "ru_word_acc": 0.1791044776119403,
+      "kz_word_acc": 0.417491054514839,
+      "n_utts": 1546,
+      "n_ref_words": 20428
+    },
+    "test_read": {
+      "wer": 0.43184556330727636,
+      "cer": 0.1089340569520467,
+      "cs_wer": 0.5368421052631579,
+      "mono_wer": 0.4312836258133574,
+      "ru_word_acc": 0.4117647058823529,
+      "kz_word_acc": 0.6104810439803222,
+      "n_utts": 3327,
+      "n_ref_words": 35691
+    }
+  }
+}

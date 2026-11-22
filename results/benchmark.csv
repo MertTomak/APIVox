@@ -29,7 +29,11 @@ whisper_small_zs,baseline,openai/whisper-small,973afd24965f72e36ca33b3055d56a652
 whisper_small_zs,baseline,openai/whisper-small,973afd24965f72e36ca33b3055d56a652f456b4d,test_read,0.8703,0.0000,0.8468-0.8983,0.3680,1.3211,0.8679,0.2353,0.2283,1,0.0,unknown,mms_kk_zs,0.000
 whisper_large_zs,baseline,openai/whisper-large-v3,06f233fe06e710322aca913c1bc4249a0d71fce1,test,0.6271,0.0000,0.6093-0.6480,0.2697,0.6750,0.6233,0.1791,0.4175,1,0.0,unknown,whisper_small_zs,1.000
 whisper_large_zs,baseline,openai/whisper-large-v3,06f233fe06e710322aca913c1bc4249a0d71fce1,test_read,0.4318,0.0000,0.4194-0.4476,0.1089,0.5368,0.4313,0.4118,0.6105,1,0.0,unknown,whisper_small_zs,1.000
+whisper_small_ft,contribution,openai/whisper-small,973afd24965f72e36ca33b3055d56a652f456b4d,dev,0.3401,0.0000,0.3276-0.3532,0.1339,0.3753,0.3378,0.5316,0.7413,1,15124.8,unknown,,
+whisper_small_ft,contribution,openai/whisper-small,973afd24965f72e36ca33b3055d56a652f456b4d,test,0.3272,0.0000,0.3154-0.3404,0.1263,0.3592,0.3246,0.5746,0.7258,1,15124.8,unknown,whisper_large_zs;whisper_small_zs,1.000;1.000
+whisper_small_ft,contribution,openai/whisper-small,973afd24965f72e36ca33b3055d56a652f456b4d,test_talkshow,0.2694,0.0000,0.2628-0.2763,0.1037,0.3175,0.2647,0.6131,0.7915,1,15124.8,unknown,whisper_small_zs,1.000
+whisper_small_ft,contribution,openai/whisper-small,973afd24965f72e36ca33b3055d56a652f456b4d,test_read,0.2993,0.0000,0.2921-0.3060,0.0805,0.4105,0.2987,0.5294,0.7470,1,15124.8,unknown,whisper_large_zs;whisper_small_zs,1.000;1.000
 mhubert_ft,contribution,utter-project/mHuBERT-147,7ad3fc0bc5106c58c9c13526abccad527150d135,dev,0.5027,0.0000,0.4902-0.5136,0.1538,0.5781,0.4978,0.0759,0.5746,1,4396.7,unknown,,
-mhubert_ft,contribution,utter-project/mHuBERT-147,7ad3fc0bc5106c58c9c13526abccad527150d135,test,0.4832,0.0000,0.4737-0.4926,0.1414,0.5296,0.4794,0.1045,0.5642,1,4396.7,unknown,whisper_large_zs,1.000
-mhubert_ft,contribution,utter-project/mHuBERT-147,7ad3fc0bc5106c58c9c13526abccad527150d135,test_talkshow,0.4148,0.0000,0.4079-0.4217,0.1210,0.5049,0.4061,0.1234,0.6467,1,4396.7,unknown,,
-mhubert_ft,contribution,utter-project/mHuBERT-147,7ad3fc0bc5106c58c9c13526abccad527150d135,test_read,0.4224,0.0000,0.4152-0.4288,0.0890,0.5263,0.4218,0.0588,0.6238,1,4396.7,unknown,whisper_large_zs,0.908
+mhubert_ft,contribution,utter-project/mHuBERT-147,7ad3fc0bc5106c58c9c13526abccad527150d135,test,0.4832,0.0000,0.4737-0.4926,0.1414,0.5296,0.4794,0.1045,0.5642,1,4396.7,unknown,whisper_small_ft,0.000
+mhubert_ft,contribution,utter-project/mHuBERT-147,7ad3fc0bc5106c58c9c13526abccad527150d135,test_talkshow,0.4148,0.0000,0.4079-0.4217,0.1210,0.5049,0.4061,0.1234,0.6467,1,4396.7,unknown,whisper_small_ft,0.000
+mhubert_ft,contribution,utter-project/mHuBERT-147,7ad3fc0bc5106c58c9c13526abccad527150d135,test_read,0.4224,0.0000,0.4152-0.4288,0.0890,0.5263,0.4218,0.0588,0.6238,1,4396.7,unknown,whisper_small_ft,0.000

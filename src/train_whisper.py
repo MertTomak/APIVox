@@ -18,7 +18,7 @@ MODEL_NAME = "whisper_small_ft"
 BASE = MODELS["whisper_small_zs"]
 FIXTURE = data_io.ROOT / "tests" / "fixtures" / "mini.jsonl"
 CONFIG = {
-    "lr": 1e-5,
+    "lr": 3e-5,
     "weight_decay": 0.0,
     "warmup_steps": 500,
     "batch_size": 16,

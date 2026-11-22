@@ -13,7 +13,7 @@ Speech recognition for spontaneous Kazakh with Kazakh-Russian code-switching: a 
 | Test regimes | `test` (spontaneous podcasts), `test_talkshow` (a talk show program never seen in training), `test_read` (read speech) |
 | Models | 4 published models without training, 4 models trained by us from scratch (GMM-HMM, CTC, attention encoder-decoder, RNN-T), 2 fine-tuned models (our contribution) |
 | Main metric | corpus-level WER on normalized text; CER and code-switching metrics alongside |
-| Best test WER | `mhubert_ft` 0.4832 (`results/benchmark.csv`) |
+| Best test WER | `whisper_small_ft` 0.3272 (`results/benchmark.csv`) |
 
 ## Why this project is new
 
@@ -155,8 +155,11 @@ All numbers in this section are rows of `results/benchmark.csv` and `results/abl
 | mhubert_ft | test | 0.4832 | 0.4737-0.4926 | 0.1414 | 0.5296 | 0.4794 | 0.1045 | 1 | unknown |
 | mhubert_ft | test_talkshow | 0.4148 | 0.4079-0.4217 | 0.1210 | 0.5049 | 0.4061 | 0.1234 | 1 | unknown |
 | mhubert_ft | test_read | 0.4224 | 0.4152-0.4288 | 0.0890 | 0.5263 | 0.4218 | 0.0588 | 1 | unknown |
+| whisper_small_ft | test | 0.3272 | 0.3154-0.3404 | 0.1263 | 0.3592 | 0.3246 | 0.5746 | 1 | unknown |
+| whisper_small_ft | test_talkshow | 0.2694 | 0.2628-0.2763 | 0.1037 | 0.3175 | 0.2647 | 0.6131 | 1 | unknown |
+| whisper_small_ft | test_read | 0.2993 | 0.2921-0.3060 | 0.0805 | 0.4105 | 0.2987 | 0.5294 | 1 | unknown |
 
-`whisper_small_ft` seed 42 is still running at the time of writing; its rows are added from `results/benchmark.csv` when the run file arrives.
+`whisper_small_ft` has one seed (2026); `mhubert_ft` has one seed (42).
 
 ### Dev
 
@@ -170,6 +173,7 @@ All numbers in this section are rows of `results/benchmark.csv` and `results/abl
 | mms_kk_zs | 0.5119 | 0.1715 |
 | whisper_small_zs | 1.2069 | 0.9506 |
 | mhubert_ft | 0.5027 | 0.1538 |
+| whisper_small_ft | 0.3401 | 0.1339 |
 
 ### Significance (paired bootstrap, `p_lower_wer`)
 
@@ -177,7 +181,9 @@ Probability that the first model has a lower WER than the second, on the same re
 
 | model | compared with | test | test_talkshow | test_read |
 |---|---|---|---|---|
-| mhubert_ft | whisper_large_zs | 1.000 | – | 0.908 |
+| whisper_small_ft | whisper_small_zs | 1.000 | 1.000 | 1.000 |
+| whisper_small_ft | whisper_large_zs | 1.000 | – | 1.000 |
+| mhubert_ft | whisper_small_ft | 0.000 | 0.000 | 0.000 |
 | whisper_large_zs | whisper_small_zs | 1.000 | – | 1.000 |
 | whisper_small_zs | mms_kk_zs | 0.000 | 0.000 | 0.000 |
 | mms_kk_zs | xlsr_kk_zs | 1.000 | 1.000 | 0.000 |
@@ -212,15 +218,15 @@ Probability that the first model has a lower WER than the second, on the same re
 
 - **RQ1, read to spontaneous.** Every pretrained baseline is worse on spontaneous `test` than on `test_read`: `mms_kk_zs` 0.2690 → 0.5002, `whisper_large_zs` 0.4318 → 0.6271, `whisper_small_zs` 0.8703 → 1.1285, `xlsr_kk_zs` 0.2032 → 0.5831 (its `test_read` is contaminated: it was fine-tuned on KSC train).
 - **RQ2, code-switching.** `cs_wer` is above `mono_wer` for every pretrained baseline and for `mhubert_ft` on every test split they were run on, and Russian words are rarely recognized: `ru_word_acc` on `test` is 0.0448 to 0.1791 for the pretrained baselines and 0.1045 for `mhubert_ft`.
-- **RQ3, contribution.** `mhubert_ft` has the lowest WER on `test` (0.4832), ahead of `whisper_large_zs` with probability 1.000 in the paired bootstrap. On the unseen talk show program it reaches 0.4148, about the same as `mms_kk_zs` (0.4139). Fine-tuning closes much of the read-to-spontaneous gap (`test` 0.4832 against `test_read` 0.4224), but not the code-switching gap (`ru_word_acc` 0.1045).
+- **RQ3, contribution.** Fine-tuning `openai/whisper-small` on our spontaneous train split takes its test WER from 1.1285 (`whisper_small_zs`) to 0.3272 (`whisper_small_ft`), the best result of the benchmark; in the paired bootstrap it beats `whisper_small_zs`, `whisper_large_zs` and `mhubert_ft` with probability 1.000. It is best on the unseen talk show program too (0.2694, against 0.4139 for `mms_kk_zs`), and the gap between spontaneous `test` and read `test_read` becomes small (0.3272 against 0.2993). The code-switching gap shrinks but remains: `ru_word_acc` on `test` rises from 0.0522 to 0.5746, and `cs_wer` is still above `mono_wer` (0.3592 against 0.3246). `mhubert_ft` (0.4832 on `test`) is the second-best model.
 
 ## Error analysis
 
-[`results/error_analysis.md`](results/error_analysis.md) counts the word errors of the best model and of `whisper_small_zs` by type (`python -m src.build_benchmark --final --errors`). For `mhubert_ft`, the largest named type is a correct stem with a wrong suffix (2274 of 9870 errors on `test`); of the 114 `ru` and 20 `mix` words in `test`, 93 are substituted and 27 deleted. `whisper_small_zs` mostly drops words and inserts words that are not in the audio.
+[`results/error_analysis.md`](results/error_analysis.md) counts the word errors of the best model (`whisper_small_ft`) and of `whisper_small_zs`, the same checkpoint before fine-tuning, by type (`python -m src.build_benchmark --final --errors`). Fine-tuning cuts the test errors from 23054 to 6684, mostly deletions (4852 → 807) and insertions (4787 → 896). The largest named type left is a correct stem with a wrong suffix (1521 of 6684 errors on `test`); of the 114 `ru` and 20 `mix` words in `test`, 48 are still substituted and 9 deleted.
 
 ## Limitations
 
-- **One seed for several models.** `aed`, `rnnt`, `mhubert_ft` and `whisper_small_ft` have only seed 42, so their variance across seeds is unknown; `whisper_large_zs` has no `dev` and `test_talkshow` scores. These are cut-off decisions forced by the compute budget (free GPU quotas).
+- **One seed for several models.** `aed`, `rnnt` and `mhubert_ft` have only seed 42 and `whisper_small_ft` only seed 2026, so their variance across seeds is unknown; `whisper_large_zs` has no `dev` and `test_talkshow` scores. These are cut-off decisions forced by the compute budget (free GPU quotas).
 - **Small training budget for the models trained from scratch.** 31.079 hours of training data and a time limit per run are not enough for them to learn words; their numbers describe early training, not the limit of each method.
 - **Speaker separation is by program.** KSC2 has no speaker labels; a guest could appear in two podcast programs, and we cannot check this.
 - **The code-switching tagger is conservative.** The hand audit found 94.9 % word-level precision but also missed Russian words (`docs/preprocessing.md`), so the code-switched counts are a lower bound. The audit was done by a team member who is not a native speaker of Kazakh or Russian.
@@ -295,7 +301,7 @@ python -m src.train_scratch --head rnnt --final --seed 42 --max-minutes 15
 python -m src.train_scratch --head ctc --final --seed 42 --epochs 5 --features mfcc
 python -m src.train_scratch --head ctc --final --seed 42 --epochs 5 --no-aug
 python -m src.train_whisper --lr-sweep
-python -m src.train_whisper --final --seed 42
+python -m src.train_whisper --final --seed 2026
 python -m src.train_mhubert --final --seed 42
 python -m src.build_benchmark --final
 python -m src.build_benchmark --final --errors

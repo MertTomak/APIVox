@@ -1,0 +1,101 @@
+{
+  "model": "whisper_small_ft",
+  "seed": 2026,
+  "checkpoint": "openai/whisper-small",
+  "revision": "973afd24965f72e36ca33b3055d56a652f456b4d",
+  "config": {
+    "lr": 3e-05,
+    "weight_decay": 0.0,
+    "warmup_steps": 500,
+    "batch_size": 16,
+    "micro_batch_size": 8,
+    "epochs": 5,
+    "grad_clip": 1.0,
+    "eval_batch_seconds": 240.0,
+    "language": "kazakh",
+    "task": "transcribe",
+    "decoding": "greedy",
+    "architecture": "Transformer encoder-decoder",
+    "initialized_from": "openai/whisper-small",
+    "precision": "fp16 autocast",
+    "ksc_training": "not stated: the model card describes 680k hours of web audio and names no datasets",
+    "dev_curve": [
+      {
+        "epoch": 1,
+        "train_loss": 0.5643025119207684,
+        "dev_wer": 0.5042553191489362,
+        "dev_cer": 0.19795787728374592
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.19711967288590915,
+        "dev_wer": 0.4126950354609929,
+        "dev_cer": 0.1753644024220037
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.07874158485550929,
+        "dev_wer": 0.369645390070922,
+        "dev_cer": 0.1472930855361884
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.026368160561875926,
+        "dev_wer": 0.345177304964539,
+        "dev_cer": 0.13727136305919638
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.00667641886155974,
+        "dev_wer": 0.3400709219858156,
+        "dev_cer": 0.1339342868836116
+      }
+    ]
+  },
+  "train_time_s": 15124.8,
+  "hardware": "Tesla T4",
+  "n_params": 241734912,
+  "best_epoch": 5,
+  "splits": {
+    "dev": {
+      "wer": 0.3400709219858156,
+      "cer": 0.1339342868836116,
+      "cs_wer": 0.3752913752913753,
+      "mono_wer": 0.3377888536474853,
+      "ru_word_acc": 0.5316455696202531,
+      "kz_word_acc": 0.7413298161222748,
+      "n_utts": 1081,
+      "n_ref_words": 14100
+    },
+    "test": {
+      "wer": 0.32719796357940084,
+      "cer": 0.12630739749272246,
+      "cs_wer": 0.3592105263157895,
+      "mono_wer": 0.3246244975671673,
+      "ru_word_acc": 0.5746268656716418,
+      "kz_word_acc": 0.7257945695643022,
+      "n_utts": 1546,
+      "n_ref_words": 20428
+    },
+    "test_talkshow": {
+      "wer": 0.26936970725833514,
+      "cer": 0.10366307928443842,
+      "cs_wer": 0.31754937163375224,
+      "mono_wer": 0.26472306993052397,
+      "ru_word_acc": 0.6130841121495327,
+      "kz_word_acc": 0.7914707071566895,
+      "n_utts": 4368,
+      "n_ref_words": 50659
+    },
+    "test_read": {
+      "wer": 0.29929113782185984,
+      "cer": 0.08051226626689445,
+      "cs_wer": 0.4105263157894737,
+      "mono_wer": 0.29869581138559476,
+      "ru_word_acc": 0.5294117647058824,
+      "kz_word_acc": 0.7470468671753027,
+      "n_utts": 3327,
+      "n_ref_words": 35691
+    }
+  }
+}
